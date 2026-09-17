@@ -17,6 +17,7 @@
       <button class="view-btn" data-view="marks">Marks</button>
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
+      <button class="view-btn" data-view="spindown">Spindown</button>
     </nav>
     <div class="players" id="players"></div>
     <form class="add-player" id="add-form" autocomplete="off">
@@ -94,6 +95,27 @@
     </section>
   </div>
 
+  <div class="view" id="view-spindown" hidden>
+    <section class="sheet">
+      <div class="sheet-head"><h2>Spindown calculator</h2></div>
+      <p class="estimate"><b>This is an estimate.</b> Unlocked items are guessed from Steam achievements. Your save can differ (for example after a save reset or an Alt+F2 sync), and a co-op run follows one save file, most likely the host's. Hidden items like Recall and Hold are always skipped.</p>
+      <div class="spin-controls">
+        <label class="spin-field">Unlocks from
+          <select id="spin-source"></select>
+        </label>
+        <label class="check dark"><input type="checkbox" id="spin-all"> Ignore unlocks (every item counts)</label>
+        <label class="spin-field">Uses
+          <select id="spin-steps"><option>5</option><option>10</option><option>20</option></select>
+        </label>
+      </div>
+      <div class="spin-search">
+        <input id="spin-input" type="search" placeholder="Item on the pedestal: name or ID" aria-label="Search item by name or ID" autocomplete="off">
+        <ul id="spin-results" class="spin-results" hidden></ul>
+      </div>
+      <div id="spin-out" class="spin-out"></div>
+    </section>
+  </div>
+
   <dialog id="unlock" class="unlock">
     <button class="u-close" aria-label="Close" autofocus>✕</button>
     <div id="unlock-body"></div>
@@ -106,6 +128,7 @@
   <script src="js/data.js"></script>
   <script src="js/challenges.js"></script>
   <script src="js/unlocks.js"></script>
+  <script src="js/items.js"></script>
   <script src="js/coop.js"></script>
   <script src="js/art.js"></script>
   <script src="js/app.js"></script>

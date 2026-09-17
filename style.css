@@ -414,3 +414,39 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .pros, .cons { margin: 2px 0 0; padding-left: 16px; font-size: 14px; line-height: 1.2; }
 .pros li::marker { content: "+ "; color: #2f8f4e; }
 .cons li::marker { content: "− "; color: var(--blood); }
+
+/* ---------- spindown ---------- */
+.estimate { margin: 8px 0 14px; padding: 8px 12px; border: 2.5px dashed var(--blood); border-radius: 8px; background: rgba(156, 28, 23, .07); line-height: 1.25; }
+.estimate b { color: var(--blood); font-weight: 400; }
+.spin-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-bottom: 12px; }
+.spin-field { display: flex; align-items: center; gap: 6px; }
+.spin-field select { padding: 4px 6px; background: var(--note); border: 2.5px solid var(--ink); border-radius: 8px; max-width: 240px; }
+.spin-controls .check input:checked + * { color: var(--blood); }
+.spin-search { position: relative; max-width: 460px; }
+.spin-search input { width: 100%; padding: 8px 12px; font-size: 20px; background: var(--paper-noise), var(--note); border: 3px solid var(--ink); border-radius: 10px 6px 12px 8px; }
+.spin-results { position: absolute; z-index: 5; left: 0; right: 0; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--note); border: 2.5px solid var(--ink); border-radius: 8px; box-shadow: 4px 5px 0 rgba(0,0,0,.4); max-height: 320px; overflow-y: auto; }
+.spin-results li { padding: 4px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.spin-results li:hover, .spin-results li.active { background: rgba(0,0,0,.08); }
+.iid { color: var(--ink-soft); font-size: 15px; min-width: 42px; }
+.qual { color: #b8860b; letter-spacing: -1px; font-size: 14px; white-space: nowrap; }
+.qual.q0 { color: #8a7a6a; }
+.spin-out { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.spin-out h3 { margin: 0 0 6px; font-size: 24px; font-weight: 400; }
+.spin-current { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; padding: 10px 14px; border: 3px solid var(--ink); border-radius: 12px 8px 14px 10px; background: rgba(255,255,255,.3); }
+.spin-current .big-id { grid-row: span 3; font-size: 40px; color: var(--ink-soft); align-self: center; }
+.spin-current .nm { font-size: 30px; line-height: 1; }
+.spin-current .q { color: #7a4b2a; }
+.spin-current .d { font-size: 15px; color: var(--ink-soft); }
+.chain { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chain li { display: grid; grid-template-columns: 44px 1fr; gap: 0 8px; align-items: baseline; }
+.chain .uses { font-size: 15px; color: var(--ink-soft); text-align: right; }
+.chain button { text-align: left; background: none; border: 0; padding: 2px 6px; border-radius: 6px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; }
+.chain button:hover { background: rgba(0,0,0,.07); }
+.chain .hit.q4 { background: rgba(242, 201, 76, .35); }
+.chain .hit.q3 { background: rgba(242, 201, 76, .15); }
+.chain .who { display: inline-flex; gap: 2px; }
+.chain .who i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink); display: inline-block; }
+.skipped { grid-column: 2; font-size: 13px; color: var(--ink-soft); padding-left: 6px; line-height: 1.15; }
+.skipped s { text-decoration-thickness: 1.5px; }
+.spin-note { font-size: 14px; color: var(--ink-soft); margin: 6px 0 0; }
+@media (max-width: 760px) { .spin-out { grid-template-columns: 1fr; } }

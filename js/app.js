@@ -29,6 +29,7 @@
     hard: true,
     chalFilter: 'all',
     squad: { goals: {}, dupes: false },
+    spin: { source: 'union', all: false, steps: 10, item: null },
   };
 
   // ---------- persistence ----------
@@ -36,7 +37,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         view: state.view, selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
-        chalFilter: state.chalFilter, squad: state.squad,
+        chalFilter: state.chalFilter, squad: state.squad, spin: state.spin,
         players: state.players.map((p) => ({
           input: p.input, path: p.path, sid: p.sid, color: p.color, name: p.name, avatar: p.avatar,
           unlocked: p.unlocked ? [...p.unlocked] : null, fetchedAt: p.fetchedAt,
@@ -81,6 +82,7 @@
       Object.assign(state, {
         view: d.view || 'marks', selected: d.selected || 'isaac', filter: d.filter || 'all', coopSort: !!d.coopSort,
         hard: d.hard !== false, chalFilter: d.chalFilter || 'all', squad: { goals: {}, dupes: false, ...(d.squad || {}) },
+        spin: { ...state.spin, ...(d.spin || {}) },
       });
       state.players = (d.players || []).map((p) => ({ ...p, unlocked: p.unlocked ? new Set(p.unlocked) : null, status: p.unlocked ? 'ok' : 'idle' }));
     } catch (e) { /* ignore corrupt or blocked storage */ }
@@ -471,11 +473,124 @@
     }).join('');
   }
 
+  // ---------- spindown ----------
+  // Spindown Dice lowers an item's ID by one, skipping IDs that don't exist, hidden items and items
+  // that aren't unlocked on the save the run uses. Unlocks are estimated from Steam achievements.
+  const itemById = new Map(ITEMS.map((r) => [r[0], { id: r[0], name: r[1], quality: r[2], ach: r[3], quote: r[4], desc: r[5], hidden: !!r[6] }]));
+  const MAX_ITEM_ID = ITEMS[ITEMS.length - 1][0];
+
+  function spinOwners(it) {
+    return loaded().filter((p) => !it.ach || p.unlocked.has(it.ach));
+  }
+  // Why an ID is skipped, or null if Spindown can land on it.
+  function skipReason(id) {
+    const it = itemById.get(id);
+    if (!it) return 'no item with this ID';
+    if (it.hidden) return 'hidden item';
+    if (state.spin.all || !it.ach) return null;
+    const ps = loaded();
+    const p = state.spin.source !== 'union' && ps.find((x) => x.path === state.spin.source);
+    if (!p) return ps.some((x) => x.unlocked.has(it.ach)) ? null : 'locked for everyone';
+    return p.unlocked.has(it.ach) ? null : `locked for ${pname(p)}`;
+  }
+
+  const qualityStars = (q) => `<span class="qual q${q}" title="Quality ${q}">${'★'.repeat(q)}${'☆'.repeat(4 - q)}</span>`;
+  const ownerDots = (it) => {
+    if (!it.ach || loaded().length < 2 || state.spin.all) return '';
+    const owners = spinOwners(it);
+    return `<span class="who" title="Unlocked for: ${esc(owners.map(pname).join(', ') || 'nobody')}">${owners.map((p) => `<i style="background:${p.color}"></i>`).join('')}</span>`;
+  };
+
+  function renderSpindown() {
+    const ps = loaded();
+    const sources = [['union', ps.length > 1 ? 'Everyone combined (union)' : ps.length ? `${pname(ps[0])}'s save` : 'No players loaded']]
+      .concat(ps.length > 1 ? ps.map((p) => [p.path, `${pname(p)}'s save`]) : []);
+    if (!sources.some(([v]) => v === state.spin.source)) state.spin.source = 'union';
+    $('#spin-source').innerHTML = sources.map(([v, l]) => `<option value="${esc(v)}"${v === state.spin.source ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    $('#spin-source').disabled = state.spin.all;
+    $('#spin-all').checked = state.spin.all;
+    $('#spin-steps').value = String(state.spin.steps);
+
+    const cur = itemById.get(state.spin.item);
+    if (!cur) { $('#spin-out').innerHTML = '<p class="empty-hint light">Search for the item on the pedestal to see what Spindown Dice turns it into.</p>'; return; }
+    const warn = !state.spin.all && !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked count. Add players or tick "Ignore unlocks".</p>' : '';
+
+    // Forward: what this item becomes after 1..N uses.
+    let fwd = '', id = cur.id;
+    for (let use = 1; use <= state.spin.steps; use++) {
+      let next = id - 1;
+      const skipped = [];
+      while (next >= 1 && skipReason(next)) { if (itemById.get(next)) skipped.push(next); next--; }
+      if (next < 1) { fwd += `<li><span class="uses">${use}×</span><span>Nothing left below this ID.</span></li>`; break; }
+      fwd += chainRow(use, itemById.get(next), skipped);
+      id = next;
+    }
+
+    // Backward: items above this one that spin down into it within N uses.
+    let back = '', uses = 0;
+    let backSkipped = [];
+    for (let up = cur.id + 1; up <= MAX_ITEM_ID && uses < state.spin.steps; up++) {
+      if (!skipReason(up)) { uses++; back += chainRow(uses, itemById.get(up), backSkipped); backSkipped = []; }
+      else if (itemById.get(up)) backSkipped.push(up);
+    }
+
+    const curSkip = skipReason(cur.id);
+    $('#spin-out').innerHTML = `${warn}
+      <div class="spin-current">
+        <span class="big-id">#${cur.id}</span>
+        <span class="nm">${esc(cur.name)} ${qualityStars(cur.quality)} ${ownerDots(cur)}</span>
+        ${cur.quote ? `<span class="q">“${esc(cur.quote)}”</span>` : '<span></span>'}
+        <span class="d">${esc(cur.desc)}${curSkip ? ` <b>(${esc(curSkip)})</b>` : ''}</span>
+      </div>
+      <div><h3>Spin it down</h3><ol class="chain">${fwd}</ol></div>
+      <div><h3>Items that spin into it</h3><ol class="chain">${back || '<li><span></span><span>Nothing above it.</span></li>'}</ol>
+        <p class="spin-note">Click any item to jump to it. ★ = item quality; gold rows are quality 3–4. Colored dots = players who have that item unlocked.</p></div>`;
+  }
+
+  function chainRow(use, it, skipped) {
+    const skip = skipped.length
+      ? `<span class="skipped">skipped: ${skipped.map((sid) => `<s title="${esc(skipReason(sid))}">#${sid} ${esc(itemById.get(sid).name)}</s>`).join(', ')}</span>` : '';
+    return `<li><span class="uses">${use}×</span>
+      <button class="hit q${it.quality}" data-item="${it.id}" title="${esc(it.desc)}"><span class="iid">#${it.id}</span>${esc(it.name)} ${qualityStars(it.quality)} ${ownerDots(it)}</button>${skip}</li>`;
+  }
+
+  function searchItems(q) {
+    q = q.trim().toLowerCase().replace(/^#/, '');
+    if (!q) return [];
+    if (/^\d+$/.test(q)) {
+      return [itemById.get(+q), ...ITEMS.filter((r) => String(r[0]).startsWith(q) && r[0] !== +q).map((r) => itemById.get(r[0]))]
+        .filter(Boolean).slice(0, 10);
+    }
+    const starts = [], has = [];
+    for (const it of itemById.values()) {
+      const n = it.name.toLowerCase();
+      if (n.startsWith(q) || n.replace(/^the /, '').startsWith(q)) starts.push(it);
+      else if (n.includes(q)) has.push(it);
+    }
+    return starts.concat(has).slice(0, 10);
+  }
+
+  function renderSearch() {
+    const list = searchItems($('#spin-input').value);
+    const ul = $('#spin-results');
+    ul.hidden = !list.length;
+    ul.innerHTML = list.map((it, i) => `<li data-item="${it.id}" class="${i === 0 ? 'active' : ''}"><span class="iid">#${it.id}</span>${esc(it.name)} ${qualityStars(it.quality)}</li>`).join('');
+  }
+
+  function pickItem(id) {
+    state.spin.item = +id;
+    $('#spin-input').value = '';
+    $('#spin-results').hidden = true;
+    save();
+    renderSpindown();
+  }
+
   // ---------- views ----------
   function renderView() {
     if (state.view === 'marks') { renderCarousel(); renderStage(); }
     if (state.view === 'challenges') renderChallenges();
     if (state.view === 'squad') renderSquad();
+    if (state.view === 'spindown') renderSpindown();
   }
 
   function render() {
@@ -562,6 +677,32 @@
   $$('#view-marks .tab').forEach((t) => t.addEventListener('click', () => { state.filter = t.dataset.filter; save(); select(state.selected); }));
   $('#sort-coop').addEventListener('change', (e) => { state.coopSort = e.target.checked; save(); select(state.selected); });
   $('#hard-mode').addEventListener('change', (e) => { state.hard = e.target.checked; save(); renderStage(); });
+
+  $('#spin-input').addEventListener('input', renderSearch);
+  $('#spin-input').addEventListener('keydown', (e) => {
+    const items = [...$$('#spin-results li')];
+    const i = Math.max(0, items.findIndex((li) => li.classList.contains('active')));
+    if (e.key === 'Enter' && items[i]) { e.preventDefault(); pickItem(items[i].dataset.item); }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
+      e.preventDefault();
+      const j = (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((li, k) => li.classList.toggle('active', k === j));
+      items[j].scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Escape') $('#spin-results').hidden = true;
+  });
+  $('#spin-results').addEventListener('mousedown', (e) => {
+    const li = e.target.closest('[data-item]');
+    if (li) { e.preventDefault(); pickItem(li.dataset.item); }
+  });
+  $('#spin-input').addEventListener('blur', () => { $('#spin-results').hidden = true; });
+  $('#spin-out').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-item]');
+    if (b) pickItem(b.dataset.item);
+  });
+  $('#spin-source').addEventListener('change', (e) => { state.spin.source = e.target.value; save(); renderSpindown(); });
+  $('#spin-all').addEventListener('change', (e) => { state.spin.all = e.target.checked; save(); renderSpindown(); });
+  $('#spin-steps').addEventListener('change', (e) => { state.spin.steps = +e.target.value; save(); renderSpindown(); });
 
   $('#note').addEventListener('click', (e) => {
     const slot = e.target.closest('[data-mark]');
