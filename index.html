@@ -22,7 +22,7 @@
     </nav>
     <div class="players" id="players"></div>
     <form class="add-player" id="add-form" autocomplete="off">
-      <input id="add-input" type="text" placeholder="Steam profile link or ID" aria-label="Steam profile link or ID">
+      <input id="add-input" type="text" placeholder="steamcommunity.com/id/NAME or 76561198…" title="Paste a Steam profile link (steamcommunity.com/id/… or /profiles/…) or a 17-digit Steam ID. The profile and its game details must be public." aria-label="Steam profile link or Steam ID">
       <button type="submit" class="btn">+ Add player</button>
     </form>
   </header>
@@ -56,7 +56,7 @@
         <h2>Challenges</h2>
         <div class="tabs" id="chal-filter">
           <button class="tab" data-f="all">All</button>
-          <button class="tab" data-f="ready">Ready for co-op</button>
+          <button class="tab" data-f="ready" title="Everyone has it unlocked and someone still needs to beat it">Ready for co-op</button>
           <button class="tab" data-f="todo">Someone needs it</button>
           <button class="tab" data-f="locked">Locked for someone</button>
         </div>
@@ -65,14 +65,22 @@
         <span class="chip-demo lock">🔒</span> locked &nbsp; <span class="chip-demo open"></span> unlocked, not beaten &nbsp; <span class="chip-demo done">✓</span> beaten.
         In co-op every player plays the challenge's character.
       </p>
-      <div id="chal-list" class="chal-list"></div>
+      <div id="chal-list" class="chal-grid"></div>
     </section>
   </div>
 
   <div class="view" id="view-squad" hidden>
     <section class="sheet">
       <div class="sheet-head"><h2>Squad builder</h2></div>
-      <p class="sheet-sub">Pick what each player wants. Every squad gets a win chance from its characters' stats, and its value is win chance × the marks the players can still get.</p>
+      <div class="role-guide">
+        <p><b>What does each player want?</b></p>
+        <ul>
+          <li><b>✨ Auto</b>: get me the most marks.</li>
+          <li><b>🛡️ Carry</b>: I'll play something strong so the others win.</li>
+          <li><b>🎯 Hunt</b>: I want marks on one specific character.</li>
+        </ul>
+        <p>The best squads are ranked by win chance × marks the players can still get.</p>
+      </div>
       <div id="squad-controls" class="squad-controls"></div>
       <div id="squad-results" class="squad-results"></div>
       <details class="how">
@@ -99,6 +107,7 @@
   <div class="view" id="view-spindown" hidden>
     <section class="sheet">
       <div class="sheet-head"><h2>Spindown calculator</h2></div>
+      <p class="spin-intro"><b>What does Spindown Dice do?</b> It turns every item on a pedestal into the item with the ID one lower, skipping items that aren't unlocked. Type the item you see to find out what you'll get after 1, 2, 3… uses.</p>
       <p class="estimate"><b>This is an estimate.</b> Unlocked items are guessed from Steam achievements. Your save can differ (for example after a save reset or an Alt+F2 sync), and a co-op run follows one save file, most likely the host's. Hidden items like Recall and Hold are always skipped.</p>
       <div class="spin-controls">
         <label class="spin-field">Unlocks from
@@ -145,6 +154,8 @@
     <button class="u-close" aria-label="Close" autofocus>✕</button>
     <div id="unlock-body"></div>
   </dialog>
+
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <footer class="foot">
     Data: public Steam achievements (profile and game details must be public). Not affiliated with Nicalis or Edmund McMillen.

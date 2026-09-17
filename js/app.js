@@ -154,12 +154,43 @@
         const sid = tag(prof, 'steamID64');
         if (/^\d{17}$/.test(sid || '')) p.sid = sid;
       } catch (e) { /* name/avatar are optional */ }
+      const pct = overallProgress(p);
+      showToast(`✓ ${pname(p)} loaded: ${pct}% of all marks`, 'ok');
     } catch (e) {
       p.status = 'error';
-      p.error = /private/i.test(e.message) ? 'Profile or game details are private' : e.message;
+      p.error = friendlyError(e.message);
+      showToast(`${pname(p)}: ${p.error}`, 'err', 7000);
     }
     save();
     render();
+  }
+
+  // Turn Steam / relay errors into something a player can act on.
+  function friendlyError(msg) {
+    if (/private|friendsonly/i.test(msg)) return '❌ Game details are private. On Steam: Edit Profile → Privacy Settings → set "Game details" to Public.';
+    if (/could not be found|not found|404/i.test(msg)) return '❌ Profile not found. Use steamcommunity.com/id/NAME, steamcommunity.com/profiles/7656… or the 17-digit Steam ID.';
+    if (/timeout/i.test(msg)) return '⏱ Steam took too long to answer. Press ↻ to try again.';
+    if (/HTTP|network|relay/i.test(msg)) return '🌐 Could not reach Steam. Check your internet and press ↻ to retry.';
+    return `❌ ${msg}`;
+  }
+
+  // Share of all known completion marks (every character) this player has.
+  function overallProgress(p) {
+    let done = 0, total = 0;
+    for (const ch of CHARACTERS) { const s = score(ch, p); done += s.done; total += s.total; }
+    return total ? Math.round((100 * done) / total) : 0;
+  }
+
+  function showToast(message, kind = '', duration = 4000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${kind}`;
+    toast.setAttribute('role', 'status');
+    toast.textContent = message;
+    $('#toast-container').appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('out');
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
   }
 
   // ---------- marks ----------
@@ -199,13 +230,16 @@
   // ---------- rendering: players ----------
   function renderPlayers() {
     $('#players').innerHTML = state.players.map((p, i) => {
-      const status = p.status === 'loading' ? 'loading…'
+      const status = p.status === 'loading' ? 'loading from Steam…'
         : p.status === 'error' ? esc(p.error || 'failed')
-        : p.unlocked ? `${p.unlocked.size} achievements` : 'not loaded';
-      return `<div class="player" data-i="${i}">
+        : p.unlocked ? '' : 'not loaded';
+      const pct = p.unlocked ? overallProgress(p) : 0;
+      const progress = p.unlocked && p.status !== 'loading'
+        ? `<span class="player-progress" title="${pct}% of all completion marks · ${p.unlocked.size} achievements"><span class="progress-bar"><span class="progress-fill" style="--progress:${pct}%;--pc:${p.color}"></span></span>${pct}% marks</span>` : '';
+      return `<div class="player${p.status === 'loading' ? ' loading' : ''}${p.status === 'error' ? ' err' : ''}" data-i="${i}">
         <label class="swatch" style="background:${p.color}" title="Change color"><input type="color" value="${p.color}" data-act="color"></label>
         ${p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}
-        <div class="who"><span class="name">${esc(pname(p))}</span><span class="status${p.status === 'error' ? ' err' : ''}">${status}</span></div>
+        <div class="who"><span class="name">${esc(pname(p))}</span>${status ? `<span class="status${p.status === 'error' ? ' err' : ''}">${status}</span>` : ''}${progress}</div>
         <button class="mini" data-act="reload" title="Refresh">↻</button>
         <button class="mini" data-act="remove" title="Remove">✕</button>
       </div>`;
@@ -213,7 +247,7 @@
     const full = state.players.length >= MAX_PLAYERS;
     $('#add-input').disabled = full;
     $('#add-form button').disabled = full;
-    $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'Steam profile link or ID';
+    $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'steamcommunity.com/id/NAME or 76561198…';
   }
 
   // ---------- rendering: marks view ----------
@@ -230,7 +264,7 @@
         return `<div class="pip${lock ? ' locked' : ''}" title="${esc(pname(p))}: ${lock ? 'character locked' : `${s.done}/${s.total}`}"><i style="width:${(100 * s.done) / s.total}%;background:${p.color}"></i></div>`;
       }).join('');
       html += `<button class="ccard${c.tainted ? ' tainted' : ''}${c.id === state.selected ? ' sel' : ''}" data-id="${c.id}" aria-pressed="${c.id === state.selected}">
-        ${portraitSvg(c.portrait, c.tainted)}<div class="cname">${esc(c.name)}</div><div class="pips">${pips}</div></button>`;
+        ${ps.length && ps.every((p) => { const sc = score(c, p); return sc.done === sc.total; }) ? '<span class="cstar" title="Everyone has every mark">★</span>' : ''}${portraitSvg(c.portrait, c.tainted)}<div class="cname">${esc(c.name)}</div><div class="pips">${pips}</div></button>`;
     }
     $('#carousel').innerHTML = html;
     $$('#view-marks .tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.filter === state.filter));
@@ -244,7 +278,8 @@
 
     const tally = ps.map((p) => {
       const s = score(ch, p);
-      return `<li><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>${hasChar(p, ch) ? '' : '<span class="lock" title="Character not unlocked">🔒</span>'}<span class="sc">${s.done}/${s.total}</span></li>`;
+      const full = s.done === s.total;
+      return `<li class="${full ? 'complete' : ''}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>${hasChar(p, ch) ? '' : '<span class="lock" title="Character not unlocked">🔒</span>'}${full ? '<span class="stamp" title="All marks done">★ done</span>' : ''}<span class="sc">${s.done}/${s.total}</span></li>`;
     }).join('');
     const r = COOP[ch.id];
     $('#char-card').className = `char-card${ch.tainted ? ' tainted' : ''}`;
@@ -260,8 +295,14 @@
       const per = ps.map((p) => ({ p, s: markState(ch, m, p) }));
       const have = unknown ? [] : per.filter((x) => x.s === 'done');
       const missing = unknown ? [] : per.filter((x) => x.s === 'none');
-      const miss = missing.map((x) => `<span style="color:${x.p.color}">●</span>`).join('');
-      return `<button class="slot${unknown ? ' unknown' : ''}" data-mark="${m.key}" title="${esc(m.label)}: see what it unlocks">
+      const miss = missing.map((x) => `<span class="dot-missing" style="--pc:${x.p.color}" title="${esc(pname(x.p))} is missing this"></span>`).join('');
+      const tip = unknown ? `${m.label} — Steam doesn't track this mark here`
+        : !ps.length ? `${m.label} — click to see what it unlocks`
+        : have.length === ps.length ? `${m.label} — everyone has it ✓`
+        : have.length ? `${m.label} — ${have.length}/${ps.length} have it · missing: ${missing.map((x) => pname(x.p)).join(', ')}`
+        : `${m.label} — nobody has it yet`;
+      const sel = state.selectedMark === m.key ? ' sel' : '';
+      return `<button class="slot${unknown ? ' unknown' : ''}${sel}" data-mark="${m.key}" data-tip="${esc(tip)}" aria-label="${esc(tip)}. Click to see what it unlocks.">
         ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', state.hard)}${unknown ? '<span class="q">?</span>' : ''}
         <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></button>`;
     }).join('');
@@ -347,21 +388,29 @@
       });
     $('#chal-list').innerHTML = rows.map(({ c, st }) => {
       const ch = charByName[c.char] || charById.isaac;
-      const ready = !st.some((x) => x.s === 'lock') && !st.every((x) => x.s === 'done');
+      const locked = st.filter((x) => x.s === 'lock');
+      const need = st.filter((x) => x.s !== 'done');
+      const kind = !need.length ? 'done' : locked.length ? 'locked' : 'open';
+      const badge = kind === 'done' ? '✓ Everyone beat it'
+        : kind === 'locked' ? `🔒 Locked for ${locked.map((x) => pname(x.p)).join(', ')}`
+        : `◯ Ready for co-op · ${need.length} still need it`;
       const chips = st.map(({ p, s }) => {
         const label = s === 'done' ? 'beaten' : s === 'open' ? 'unlocked, not beaten' : 'locked';
         return `<span class="chip ${s}" style="--pc:${p.color}" title="${esc(pname(p))}: ${label}">${s === 'done' ? '✓' : s === 'lock' ? '🔒' : ''}<em>${esc(pname(p))}</em></span>`;
       }).join('');
-      const req = c.req.length ? `Unlock: ${esc(c.reqText)}` : 'Available from the start';
-      return `<article class="chal${ready ? ' ready' : ''}">
-        <div class="chal-num">${c.n}</div>
-        ${portraitSvg(ch.portrait, ch.tainted)}
-        <div class="chal-body">
-          <h3>${esc(c.name)}${ready ? '<span class="tag">ready for co-op</span>' : ''}</h3>
-          <div class="chal-meta">${esc(c.char)} · goal: ${esc(c.goal)} · reward: ${esc(c.reward)}</div>
-          <div class="chal-req">${req}</div>
+      const req = c.req.length ? `🔑 Unlock: ${esc(c.reqText)}` : '🔑 Available from the start';
+      return `<article class="chal-card ${kind}">
+        <div class="chal-header">
+          <div class="chal-portrait">${portraitSvg(ch.portrait, ch.tainted)}</div>
+          <div class="chal-info">
+            <h3 class="chal-name"><span class="chal-n">#${c.n}</span> ${esc(c.name)}</h3>
+            <p class="chal-goal">🎯 Defeat ${esc(c.goal)} as ${esc(c.char)}</p>
+            <p class="chal-reward">🎁 ${esc(c.reward)}</p>
+          </div>
         </div>
+        <span class="badge badge-${kind}">${esc(badge)}</span>
         <div class="chips">${chips}</div>
+        <p class="chal-req">${req}</p>
       </article>`;
     }).join('') || '<p class="empty-hint light">Nothing matches this filter.</p>';
   }
@@ -421,34 +470,48 @@
     } else {
       $('#squad-controls').innerHTML = ps.map((p) => {
         const goal = state.squad.goals[p.path] || 'auto';
+        const hunting = goal !== 'auto' && goal !== 'carry';
         const opt = (c) => {
-          const s = score(c, p), lock = !hasChar(p, c);
-          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${esc(c.name)} — ${lock ? 'locked' : `${s.missing} missing`}</option>`;
+          const sc = score(c, p), lock = !hasChar(p, c);
+          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${esc(c.name)} — ${lock ? 'locked' : `${sc.missing} missing`}</option>`;
         };
-        return `<label class="goal" style="--pc:${p.color}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>
-          <select data-path="${esc(p.path)}">
-            <option value="auto"${goal === 'auto' ? ' selected' : ''}>Auto: best marks for me</option>
-            <option value="carry"${goal === 'carry' ? ' selected' : ''}>Carry: help the team win</option>
-            <optgroup label="Hunt marks on…">${CHARACTERS.filter((c) => !c.tainted).map(opt).join('')}</optgroup>
-            <optgroup label="Hunt marks on… (tainted)">${CHARACTERS.filter((c) => c.tainted).map(opt).join('')}</optgroup>
-          </select></label>`;
+        const btn = (g, icon, label, tip, on) => `<button class="goal-button${on ? ' selected' : ''}" data-path="${esc(p.path)}" data-goal="${g}" aria-pressed="${on}" title="${tip}"><span class="goal-icon">${icon}</span><span class="goal-button-label">${label}</span></button>`;
+        return `<div class="goal" style="--pc:${p.color}">
+          <span class="goal-who"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span></span>
+          <div class="goal-buttons" role="group" aria-label="What ${esc(pname(p))} wants">
+            ${btn('auto', '✨', 'Auto', 'Best marks for me', goal === 'auto')}
+            ${btn('carry', '🛡️', 'Carry', 'Play something strong to help the team', goal === 'carry')}
+            ${btn('hunt', '🎯', 'Hunt', 'Pick a character you want marks on', hunting)}
+          </div>
+          ${hunting ? `<select class="hunt-select" data-path="${esc(p.path)}" aria-label="Character to hunt">
+            <optgroup label="Normal">${CHARACTERS.filter((c) => !c.tainted).map(opt).join('')}</optgroup>
+            <optgroup label="Tainted">${CHARACTERS.filter((c) => c.tainted).map(opt).join('')}</optgroup>
+          </select>` : ''}
+        </div>`;
       }).join('') + `<label class="check dark"><input type="checkbox" id="squad-dupes"${state.squad.dupes ? ' checked' : ''}> Allow the same character twice</label>`;
 
       const squads = buildSquads();
       $('#squad-results').innerHTML = squads.length ? squads.map((sq, i) => `
         <article class="squad${i === 0 ? ' best' : ''}">
-          <div class="squad-head">
-            <span class="rank">#${i + 1}</span>
-            <span class="win" title="Estimated chance the team wins the run">win chance <b>${Math.round(sq.win * 100)}%</b><span class="bar"><i style="width:${sq.win * 100}%"></i></span></span>
-            <span class="ev" title="Win chance × marks the squad can still get (weighted by goal)">value ${sq.value.toFixed(1)}</span>
+          <div class="squad-win">
+            <span class="rank">${i === 0 ? '🏆' : `#${i + 1}`}</span>
+            <div class="win-percent">${Math.round(sq.win * 100)}%</div>
+            <div class="win-bar-container">
+              <div class="win-bar"><div class="win-bar-fill" style="--win-percent:${Math.round(sq.win * 100)}%"></div></div>
+              <div class="win-label">win chance · up to ${sq.members.reduce((t, m) => t + m.gain, 0)} marks for the squad${i === 0 ? ' · <b>best pick</b>' : ''}</div>
+            </div>
           </div>
-          <div class="why">
-            <span title="0.6 × best Damage + 0.4 × average Damage">Kill speed <b>${sq.why.kill.toFixed(1)}</b></span>
-            <span title="0.5 × best Survival + 0.5 × average Survival">Staying alive <b>${sq.why.alive.toFixed(1)}</b></span>
-            <span title="Sum of Team help, each character once, max 6">Team help <b>+${sq.why.help}</b></span>
-            <span title="Sum of Team cost">Team cost <b>−${sq.why.cost}</b></span>
-            <span title="How far the average Skill is above 2.5">Skill load <b>−${sq.why.skill.toFixed(1)}</b></span>
-          </div>
+          <details class="why-wrap">
+            <summary>Why this squad?</summary>
+            <div class="why">
+              <span title="0.6 × best Damage + 0.4 × average Damage">Kill speed <b>${sq.why.kill.toFixed(1)}</b></span>
+              <span title="0.5 × best Survival + 0.5 × average Survival">Staying alive <b>${sq.why.alive.toFixed(1)}</b></span>
+              <span title="Sum of Team help, each character once, max 6">Team help <b>+${sq.why.help}</b></span>
+              <span title="Sum of Team cost">Team cost <b>−${sq.why.cost}</b></span>
+              <span title="How far the average Skill is above 2.5">Skill load <b>−${sq.why.skill.toFixed(1)}</b></span>
+              <span title="Win chance × marks the squad can still get (weighted by goal)">Score <b>${sq.value.toFixed(1)}</b></span>
+            </div>
+          </details>
           <div class="members">${sq.members.map((m) => {
             const r = COOP[m.c.id];
             return `<button class="member" data-char="${m.c.id}" style="--pc:${m.p.color}" title="${esc(r.good.concat(r.bad).join(' · '))}">
@@ -605,10 +668,24 @@
       $$('.view-btn').forEach((b) => b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'));
       renderView();
       if (view === 'marks') scrollToSelected('instant');
+      if (animate && window.scrollY > $('.top').offsetHeight) window.scrollTo({ top: 0 });
+      if (view === 'spindown' && animate && matchMedia('(pointer: fine)').matches) $('#spin-input').focus();
       save();
     };
-    if (animate && document.startViewTransition && view !== state.view) document.startViewTransition(swap);
-    else swap();
+    if (animate && document.startViewTransition && view !== state.view) {
+      // A hidden tab aborts the transition; the swap still runs, so ignore the rejection.
+      const t = document.startViewTransition(swap);
+      t.ready.catch(() => {});
+      t.finished.catch(() => {});
+    }
+    else {
+      if (animate && view !== state.view) {
+        const el = $(`#view-${view}`);
+        el.classList.remove('fade-in');
+        requestAnimationFrame(() => el.classList.add('fade-in'));
+      }
+      swap();
+    }
   }
 
   function scrollToSelected(behavior) {
@@ -617,6 +694,7 @@
   }
 
   function select(id, scroll = 'smooth') {
+    if (id !== state.selected) state.selectedMark = null;
     state.selected = id;
     save();
     renderCarousel();
@@ -637,8 +715,9 @@
     e.preventDefault();
     const input = $('#add-input').value;
     const path = profilePath(input);
-    if (!path) { $('#add-input').setCustomValidity('Paste a Steam profile link, a 17-digit Steam ID, or a custom URL name'); $('#add-input').reportValidity(); return; }
-    if (state.players.some((p) => p.path.toLowerCase() === path.toLowerCase())) { $('#add-input').value = ''; return; }
+    if (!input.trim()) { showToast('📝 Paste a Steam profile link or Steam ID first.', 'err'); $('#add-input').focus(); return; }
+    if (!path) { showToast('📝 That doesn’t look like a Steam profile. Use steamcommunity.com/id/NAME or the 17-digit Steam ID (7656…).', 'err', 6000); $('#add-input').classList.add('shake'); setTimeout(() => $('#add-input').classList.remove('shake'), 500); return; }
+    if (state.players.some((p) => p.path.toLowerCase() === path.toLowerCase())) { $('#add-input').value = ''; showToast('That player is already added.'); return; }
     const used = state.players.map((p) => p.color);
     const p = { input: input.trim(), path, color: COLORS.find((c) => !used.includes(c)) || COLORS[0], unlocked: null, status: 'idle' };
     state.players.push(p);
@@ -646,7 +725,6 @@
     save();
     loadPlayer(p);
   });
-  $('#add-input').addEventListener('input', (e) => e.target.setCustomValidity(''));
 
   $('#players').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
@@ -668,6 +746,14 @@
     const card = e.target.closest('.ccard');
     if (card) select(card.dataset.id);
   });
+  let touchX = null, touchY = null;
+  $('.stage').addEventListener('touchstart', (e) => { touchX = e.changedTouches[0].clientX; touchY = e.changedTouches[0].clientY; }, { passive: true });
+  $('.stage').addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    touchX = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
   $('#carousel').addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
@@ -706,7 +792,12 @@
 
   $('#note').addEventListener('click', (e) => {
     const slot = e.target.closest('[data-mark]');
-    if (slot) openUnlock(slot.dataset.mark);
+    if (!slot) return;
+    state.selectedMark = slot.dataset.mark;
+    $$('#note .slot.sel').forEach((el) => el.classList.remove('sel'));
+    slot.classList.add('sel', 'pop');
+    setTimeout(() => slot.classList.remove('pop'), 350);
+    openUnlock(slot.dataset.mark);
   });
   // Dialogs close on the ✕ / "Got it" button or a click on the backdrop (outside the dialog box).
   $$('dialog').forEach((d) => d.addEventListener('click', (e) => {
@@ -743,6 +834,21 @@
     renderSquad();
   });
   $('#view-squad').addEventListener('click', (e) => {
+    const gb = e.target.closest('[data-goal]');
+    if (gb) {
+      const p = loaded().find((x) => x.path === gb.dataset.path);
+      let goal = gb.dataset.goal;
+      if (goal === 'hunt') {
+        const cur = state.squad.goals[p.path];
+        // Start hunting the unlocked character this player is missing the most marks on.
+        goal = cur && cur !== 'auto' && cur !== 'carry' ? cur
+          : CHARACTERS.filter((c) => hasChar(p, c)).sort((x, y) => score(y, p).missing - score(x, p).missing)[0].id;
+      }
+      state.squad.goals[p.path] = goal;
+      save();
+      renderSquad();
+      return;
+    }
     const el = e.target.closest('[data-char]');
     if (!el) return;
     state.selected = el.dataset.char;
