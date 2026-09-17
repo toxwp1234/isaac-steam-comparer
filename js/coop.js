@@ -132,9 +132,8 @@ window.COOP = {
 //      Skill load   = how far the average Skill is above 2.5
 //      rating = 0.45·Kill + 0.35·Alive + 0.3·Help − 0.2·Cost − 0.25·Skill load
 //      win chance = 10% + 17% × rating, kept between 5% and 95%
-// 2. Squad value = win chance × Σ (goal weight × marks each player can still get, max 5 per run)
+// 2. Squad value = win chance × weighted marks on the best route for the squad (routes live in app.js)
 window.SQUAD_MODEL = {
-  RUN_CAP: 5,
   ROLE_WEIGHT: { auto: 1, carry: 0.2, pick: 1.5 },
 
   breakdown(chars) {

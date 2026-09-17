@@ -716,3 +716,28 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .pool-item .who { display: inline-flex; gap: 2px; margin-left: auto; }
 .pool-item .who i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink); display: inline-block; }
 @media (max-width: 760px) { .pool-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } .pool-item { min-height: 44px; } }
+
+/* ---------- squad goal (route + marks per player) ---------- */
+.squad-goal { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.squad-goal .rank { font-size: 30px; min-width: 38px; text-align: center; }
+.goal-text { display: flex; flex-direction: column; line-height: 1.15; }
+.goal-kicker { font-size: 14px; color: var(--ink-soft); }
+.goal-route { font-family: var(--font-heading); font-size: 28px; line-height: 1.05; color: var(--blood); }
+.goal-sum { font-size: 15px; color: var(--ink-soft); }
+.goal-sum b { color: #b8860b; font-weight: 400; }
+.goal-unlocked { font-size: 13px; color: var(--ink-soft); margin-left: 4px; }
+.member { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; background: var(--paper-noise), var(--note); border: 3px solid var(--pc); border-radius: 10px; cursor: default; }
+.member:hover { transform: none; }
+.member-head { display: grid; grid-template-columns: 56px 1fr; column-gap: 8px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
+.member-head:hover .m-char { text-decoration: underline; }
+.member-head .portrait { grid-row: 1 / span 3; width: 56px; height: 56px; }
+.m-marks { display: flex; flex-direction: column; gap: 4px; }
+.m-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.m-row.bonus { opacity: .8; }
+.m-label { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); min-width: 44px; }
+.goal-mark { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; line-height: 1; }
+.goal-mark .mark-svg { width: 24px; height: 24px; }
+.m-none { font-size: 13px; color: var(--ink-soft); }
+.bonus-tips { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.3; }
+.squad .squad-win { margin-top: 10px; }
+.squad .win-percent { font-size: 30px; }

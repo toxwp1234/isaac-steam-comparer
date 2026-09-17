@@ -461,6 +461,31 @@
     return 0.45 * r.dmg + 0.35 * r.surv + 0.3 * r.help - 0.2 * r.cost - 0.25 * Math.max(0, r.skill - 2.5);
   }
 
+  // One run can only take one route, so a squad is scored per route and gets the route with the most marks.
+  // core = marks you get by finishing the route; bonus = extra marks on the same run if you have time.
+  const ROUTES = [
+    { id: 'chest', name: 'Womb → Cathedral → The Chest', core: ['heart', 'isaac', 'bluebaby'], bonus: ['bossrush', 'hush', 'megasatan', 'delirium'] },
+    { id: 'darkroom', name: 'Womb → Sheol → Dark Room', core: ['heart', 'satan', 'lamb'], bonus: ['bossrush', 'hush', 'megasatan', 'delirium'] },
+    { id: 'mother', name: 'Alt path → Corpse → Mother', core: ['mother'], bonus: ['bossrush'] },
+    { id: 'beast', name: 'Ascent → Home → The Beast', core: ['beast'], bonus: ['bossrush'] },
+    { id: 'greed', name: 'Greedier mode', core: ['greedier', 'greed'], bonus: [] },
+  ];
+  const BONUS_WEIGHT = 0.6; // bonus marks are less certain than the route's own bosses
+  const BONUS_TIPS = {
+    bossrush: 'Boss Rush: beat Mom before 20:00',
+    hush: 'Hush: beat Mom\'s Heart before 30:00 and take the Blue Womb',
+    megasatan: 'Mega Satan: collect both Key Pieces from Angel rooms',
+    delirium: 'Delirium: take the Void portal after Hush or the final boss',
+  };
+  const markByKey = Object.fromEntries(MARKS.map((m) => [m.key, m]));
+
+  // Marks this player still needs on this character along a route.
+  function routeGain(c, p, route) {
+    const need = (keys) => keys.filter((k) => markState(c, markByKey[k], p) === 'none');
+    const core = need(route.core), bonus = need(route.bonus);
+    return { core, bonus, value: core.length + BONUS_WEIGHT * bonus.length };
+  }
+
   function buildSquads() {
     const ps = loaded();
     const M = SQUAD_MODEL;
@@ -468,18 +493,23 @@
       const goal = state.squad.goals[p.path] || 'auto';
       const role = goal === 'auto' || goal === 'carry' ? goal : 'pick';
       const weight = M.ROLE_WEIGHT[role];
-      let chars = role === 'pick' ? [charById[goal]].filter((c) => c && hasChar(p, c)) : CHARACTERS.filter((c) => hasChar(p, c));
-      const info = (c) => ({ c, gain: Math.min(score(c, p).missing, M.RUN_CAP), weight });
-      let list = chars.map(info);
+      // Only characters this player has unlocked can be suggested.
+      const chars = role === 'pick' ? [charById[goal]].filter((c) => c && hasChar(p, c)) : CHARACTERS.filter((c) => hasChar(p, c));
+      let list = chars.map((c) => {
+        const routes = ROUTES.map((r) => routeGain(c, p, r));
+        return { c, weight, routes, bestRoute: Math.max(...routes.map((g) => g.value)) };
+      });
       if (role !== 'pick') {
         // Keep the search small: the best characters for this player's marks, plus the best team picks.
-        const byMarks = [...list].sort((x, y) => (y.gain + soloValue(y.c)) - (x.gain + soloValue(x.c))).slice(0, 8);
+        const byMarks = [...list].sort((x, y) => (y.bestRoute + soloValue(y.c)) - (x.bestRoute + soloValue(x.c))).slice(0, 8);
         const byTeam = [...list].sort((x, y) => soloValue(y.c) - soloValue(x.c)).slice(0, 6);
         list = [...new Set([...byMarks, ...byTeam])];
       }
-      return { p, role, list };
+      return { p, role, list, locked: role === 'pick' && !chars.length ? charById[goal] : null };
     });
-    if (cands.some((x) => !x.list.length)) return [];
+    const blocked = cands.find((x) => x.locked);
+    if (blocked) return { error: `${pname(blocked.p)} hasn't unlocked ${blocked.locked.name} yet, so they can't hunt marks on it.` };
+    if (cands.some((x) => !x.list.length)) return { error: 'No squad possible.' };
 
     const best = [];
     const pick = new Array(cands.length);
@@ -488,18 +518,30 @@
         const chars = pick.map((x) => x.c);
         if (!state.squad.dupes && new Set(chars.map((c) => c.id)).size < chars.length) return;
         const why = M.breakdown(chars);
-        const value = why.win * pick.reduce((s, x) => s + x.weight * x.gain, 0) + 0.05 * why.win;
+        let ri = 0, marks = -1;
+        ROUTES.forEach((_, r) => {
+          const v = pick.reduce((t, x) => t + x.weight * x.routes[r].value, 0);
+          if (v > marks) { marks = v; ri = r; }
+        });
+        const value = why.win * marks + 0.05 * why.win;
         if (best.length < 5 || value > best[best.length - 1].value) {
-          best.push({ value, win: why.win, why, members: pick.map((x, k) => ({ p: cands[k].p, role: cands[k].role, ...x })) });
-          best.sort((a, b) => b.value - a.value);
+          best.push({ value, win: why.win, why, route: ROUTES[ri],
+            members: pick.map((x, k) => ({ p: cands[k].p, role: cands[k].role, c: x.c, gain: x.routes[ri] })) });
+          best.sort((a2, b2) => b2.value - a2.value);
           if (best.length > 5) best.pop();
         }
         return;
       }
       for (const x of cands[i].list) { pick[i] = x; walk(i + 1); }
     })(0);
-    return best;
+    return { squads: best };
   }
+
+  // Small mark icons in the player's color, for "what you get on this run".
+  const markChips = (keys, p, c) => keys.map((k) => {
+    const m = markByKey[k];
+    return `<span class="goal-mark" title="${esc(m.label)} on ${esc(c.name)}">${markSvg(m.icon, [{ color: p.color }], 'known', state.hard)}<span>${esc(m.label)}</span></span>`;
+  }).join('');
 
   function renderSquad() {
     const ps = loaded();
@@ -512,11 +554,12 @@
         const hunting = goal !== 'auto' && goal !== 'carry';
         const opt = (c) => {
           const sc = score(c, p), lock = !hasChar(p, c);
-          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${esc(c.name)} — ${lock ? 'locked' : `${sc.missing} missing`}</option>`;
+          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${lock ? '🔒 ' : ''}${esc(c.name)} — ${lock ? 'not unlocked' : `${sc.missing} missing`}</option>`;
         };
         const btn = (g, icon, label, tip, on) => `<button class="goal-button${on ? ' selected' : ''}" data-path="${esc(p.path)}" data-goal="${g}" aria-pressed="${on}" title="${tip}"><span class="goal-icon">${icon}</span><span class="goal-button-label">${label}</span></button>`;
+        const unlockedCount = CHARACTERS.filter((c) => hasChar(p, c)).length;
         return `<div class="goal" style="--pc:${p.color}">
-          <span class="goal-who"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span></span>
+          <span class="goal-who"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span><span class="goal-unlocked" title="Only unlocked characters are suggested">${unlockedCount}/${CHARACTERS.length} characters</span></span>
           <div class="goal-buttons" role="group" aria-label="What ${esc(pname(p))} wants">
             ${btn('auto', '✨', 'Auto', 'Best marks for me', goal === 'auto')}
             ${btn('carry', '🛡️', 'Carry', 'Play something strong to help the team', goal === 'carry')}
@@ -529,15 +572,46 @@
         </div>`;
       }).join('') + `<label class="check dark"><input type="checkbox" id="squad-dupes"${state.squad.dupes ? ' checked' : ''}> Allow the same character twice</label>`;
 
-      const squads = buildSquads();
-      $('#squad-results').innerHTML = squads.length ? squads.map((sq, i) => `
+      const result = buildSquads();
+      $('#squad-results').innerHTML = result.error ? `<p class="empty-hint light">${esc(result.error)}</p>` : result.squads.map((sq, i) => {
+        const total = sq.members.reduce((t, m) => t + m.gain.core.length + m.gain.bonus.length, 0);
+        const coreTotal = sq.members.reduce((t, m) => t + m.gain.core.length, 0);
+        const bonusKeys = [...new Set(sq.members.flatMap((m) => m.gain.bonus))];
+        const pct = Math.round(sq.win * 100);
+        return `
         <article class="squad${i === 0 ? ' best' : ''}">
-          <div class="squad-win">
+          <div class="squad-goal">
             <span class="rank">${i === 0 ? '🏆' : `#${i + 1}`}</span>
-            <div class="win-percent">${Math.round(sq.win * 100)}%</div>
+            <div class="goal-text">
+              <span class="goal-kicker">🎯 Goal for this run</span>
+              <span class="goal-route">${esc(sq.route.name)}</span>
+              <span class="goal-sum">${coreTotal} mark${coreTotal === 1 ? '' : 's'} from the route${total > coreTotal ? ` + up to ${total - coreTotal} bonus` : ''}${i === 0 ? ' · <b>best pick</b>' : ''}</span>
+            </div>
+          </div>
+          <div class="members">${sq.members.map((m) => {
+            const r = COOP[m.c.id];
+            const none = !m.gain.core.length && !m.gain.bonus.length;
+            return `<div class="member" style="--pc:${m.p.color}">
+              <button class="member-head" data-char="${m.c.id}" title="Open ${esc(m.c.name)}'s marks · ${esc(r.good.concat(r.bad).join(' · '))}">
+                ${portraitSvg(m.c.portrait, m.c.tainted)}
+                <span class="m-player">${esc(pname(m.p))}${m.role === 'carry' ? ' · carry' : m.role === 'pick' ? ' · hunting' : ''}</span>
+                <span class="m-char">${esc(m.c.name)}</span>
+                <span class="m-tags">${r.help >= 3 ? '<em class="t-sup">helps team</em>' : ''}${r.dmg >= 4 ? '<em class="t-pow">damage</em>' : ''}${r.surv >= 4 ? '<em class="t-pow">tanky</em>' : ''}${r.surv <= 0 ? '<em class="t-hard">one-hit</em>' : ''}${r.cost >= 2 ? '<em class="t-fri">takes loot</em>' : ''}</span>
+              </button>
+              <div class="m-marks">
+                ${none ? '<span class="m-none">Has every mark on this route: here to help</span>' : ''}
+                ${m.gain.core.length ? `<div class="m-row"><span class="m-label">Gets</span>${markChips(m.gain.core, m.p, m.c)}</div>` : ''}
+                ${m.gain.bonus.length ? `<div class="m-row bonus"><span class="m-label">Bonus</span>${markChips(m.gain.bonus, m.p, m.c)}</div>` : ''}
+                ${m.c.tainted && m.gain.core.some((k) => TAINTED_SHARED[k]) ? `<span class="m-none">Steam only shows this unlock once ${TAINTED_SHARED[m.gain.core.find((k) => TAINTED_SHARED[k])]} are all beaten.</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}</div>
+          ${bonusKeys.length ? `<p class="bonus-tips">Bonus marks on the same run: ${bonusKeys.map((k) => esc(BONUS_TIPS[k])).join(' · ')}</p>` : ''}
+          <div class="squad-win" title="Estimated from the characters' Damage, Survival, Team help, Team cost and Skill. Not real game statistics.">
+            <div class="win-percent">${pct}%</div>
             <div class="win-bar-container">
-              <div class="win-bar"><div class="win-bar-fill" style="--win-percent:${Math.round(sq.win * 100)}%"></div></div>
-              <div class="win-label">win chance · up to ${sq.members.reduce((t, m) => t + m.gain, 0)} marks for the squad${i === 0 ? ' · <b>best pick</b>' : ''}</div>
+              <div class="win-bar"><div class="win-bar-fill" style="--win-percent:${pct}%"></div></div>
+              <div class="win-label">estimated chance this team finishes the run (from character stats, not real data)</div>
             </div>
           </div>
           <details class="why-wrap">
@@ -548,20 +622,11 @@
               <span title="Sum of Team help, each character once, max 6">Team help <b>+${sq.why.help}</b></span>
               <span title="Sum of Team cost">Team cost <b>−${sq.why.cost}</b></span>
               <span title="How far the average Skill is above 2.5">Skill load <b>−${sq.why.skill.toFixed(1)}</b></span>
-              <span title="Win chance × marks the squad can still get (weighted by goal)">Score <b>${sq.value.toFixed(1)}</b></span>
+              <span title="Win chance × marks on the chosen route (bonus marks count ${BONUS_WEIGHT}×, weighted by goal)">Score <b>${sq.value.toFixed(1)}</b></span>
             </div>
           </details>
-          <div class="members">${sq.members.map((m) => {
-            const r = COOP[m.c.id];
-            return `<button class="member" data-char="${m.c.id}" style="--pc:${m.p.color}" title="${esc(r.good.concat(r.bad).join(' · '))}">
-              ${portraitSvg(m.c.portrait, m.c.tainted)}
-              <span class="m-player">${esc(pname(m.p))}${m.role === 'carry' ? ' · carry' : m.role === 'pick' ? ' · hunting' : ''}</span>
-              <span class="m-char">${esc(m.c.name)}</span>
-              <span class="m-gain">${m.gain ? `+${m.gain} mark${m.gain > 1 ? 's' : ''} possible` : 'no marks left'}</span>
-              <span class="m-tags">${r.help >= 3 ? '<em class="t-sup">helps team</em>' : ''}${r.dmg >= 4 ? '<em class="t-pow">damage</em>' : ''}${r.surv >= 4 ? '<em class="t-pow">tanky</em>' : ''}${r.surv <= 0 ? '<em class="t-hard">one-hit</em>' : ''}${r.cost >= 2 ? '<em class="t-fri">takes loot</em>' : ''}</span>
-            </button>`;
-          }).join('')}</div>
-        </article>`).join('') : '<p class="empty-hint light">No squad possible: a picked character is locked for that player.</p>';
+        </article>`;
+      }).join('');
     }
 
     $('#stat-help').innerHTML = Object.values(STAT_INFO).map((x) => `<li><b>${esc(x.label)}</b>: ${esc(x.q)}</li>`).join('');

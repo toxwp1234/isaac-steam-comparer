@@ -81,7 +81,7 @@
           <li><b>🛡️ Carry</b>: I'll play something strong so the others win.</li>
           <li><b>🎯 Hunt</b>: I want marks on one specific character.</li>
         </ul>
-        <p>The best squads are ranked by win chance × marks the players can still get.</p>
+        <p>Only characters a player has unlocked are suggested. Each squad gets a <b>goal</b>: the route (Chest, Dark Room, Mother, Beast or Greedier) where the players get the most marks they're still missing.</p>
       </div>
       <div id="squad-controls" class="squad-controls"></div>
       <div id="squad-results" class="squad-results"></div>
@@ -97,7 +97,9 @@
           <li><b>Team cost</b> = total Team cost. Only counts with 2+ players.</li>
           <li><b>Skill load</b> = how far the average Skill is above 2.5</li>
           <li>rating = 0.45 × Kill + 0.35 × Alive + 0.3 × Help − 0.2 × Cost − 0.25 × Skill load; win chance = 10% + 17% × rating (5–95%)</li>
-          <li><b>Goals</b>: Auto counts your marks ×1, Carry ×0.2 (so you get a strong or helpful character), hunting a picked character ×1.5. One run counts at most 5 marks per player.</li>
+          <li><b>Goals</b>: Auto counts your marks ×1, Carry ×0.2 (so you get a strong or helpful character), hunting a picked character ×1.5. </li>
+          <li><b>Route</b>: a run takes one route, so marks are counted for the best route. Its own bosses count fully; bonus marks you can add on the same run (Boss Rush, Hush, Mega Satan, Delirium) count 0.6×.</li>
+          <li><b>Score</b> = win chance × weighted marks on that route. The win chance is an estimate from the stats above, not real game data.</li>
         </ul>
       </details>
       <h3 class="sheet-h3">Character guide</h3>
