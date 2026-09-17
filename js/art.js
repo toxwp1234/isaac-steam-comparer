@@ -1,8 +1,10 @@
 // Hand-drawn look-alike SVG art: completion mark icons and character portraits.
 (function () {
   // Mark slots, in the order they appear on the note. `ach` keys come from data.js.
+  // Rows on the note: 4 / 5 / 4. `ids` = achievements that prove the mark (any of them).
+  // Beating Greedier also awards the Greed mark, so both slots accept the Greedier achievement.
   window.MARKS = [
-    { key: 'heart',     icon: 'heart',    label: "Mom's Heart / It Lives" },
+    { key: 'heart',     icon: 'heart',    label: "Mom's Heart" },
     { key: 'isaac',     icon: 'cross',    label: 'Isaac' },
     { key: 'satan',     icon: 'invcross', label: 'Satan' },
     { key: 'bluebaby',  icon: 'polaroid', label: '???' },
@@ -10,10 +12,11 @@
     { key: 'megasatan', icon: 'brim',     label: 'Mega Satan' },
     { key: 'bossrush',  icon: 'star',     label: 'Boss Rush' },
     { key: 'hush',      icon: 'hush',     label: 'Hush' },
-    { key: 'greed',     icon: 'cent',     label: 'Ultra Greed(ier)' },
     { key: 'delirium',  icon: 'paper',    label: 'Delirium' },
     { key: 'mother',    icon: 'knife',    label: 'Mother' },
     { key: 'beast',     icon: 'note',     label: 'The Beast' },
+    { key: 'greed',     icon: 'cent',     label: 'Ultra Greed', ids: ['greed', 'greedier'] },
+    { key: 'greedier',  icon: 'cent2',    label: 'Ultra Greedier' },
   ];
 
   // Icon shapes on a 100x100 canvas, drawn white so they double as masks.
@@ -29,6 +32,7 @@
     star: `<path ${W} d="M50 6l12 30 32 2-25 20 9 32-28-18-28 18 9-32-25-20 32-2z"/>`,
     hush: `<path ${W} fill-rule="evenodd" d="M50 8C27 8 10 26 10 50s17 42 40 42 40-18 40-42S73 8 50 8zM28 38c4-6 14-6 18 2-6 5-14 5-18-2zm44 0c-4-6-14-6-18 2 6 5 14 5 18-2zM34 68c10-8 22-8 32 0-10 5-22 5-32 0z"/>`,
     cent: `<path ${S(11)} d="M70 30A26 26 0 1 0 70 70"/><path ${S(9)} d="M52 10v80"/>`,
+    cent2: `<path ${S(11)} d="M70 30A26 26 0 1 0 70 70"/><path ${S(7)} d="M44 10v80M60 10v80"/>`,
     paper: `<path ${W} fill-rule="evenodd" d="M18 14l24 4 20-6 22 8-4 22 6 22-8 22-24-4-22 6-18-8 4-24-6-20zM34 34l10 12-6 12 14-6 12 10-4-16 10-8-14 2-8-12-2 14z"/>`,
     knife: `<path ${W} d="M62 6c10 10 12 30 2 50L50 64l-10-8z"/><path ${W} d="M40 60l12 10-16 22c-4 4-10 2-12-2-2-4 0-8 2-10z"/><path ${W} d="M32 54l30 22-4 5-30-22z"/>`,
     note: `<path ${W} fill-rule="evenodd" d="M16 14h54l14 14v58H16zM26 32v5h46v-5zm0 13v5h46v-5zm0 13v5h36v-5zm0 13v5h26v-5z"/>`,
@@ -52,9 +56,6 @@
       <feFlood flood-color="${c}"/>
       <feComposite in2="edge" operator="in"/>
     </filter>`).join('')}
-    <pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect width="4.5" height="9" fill="#fff" fill-opacity=".55"/>
-    </pattern>
   </defs>`;
   document.body.prepend(defs);
 
@@ -66,14 +67,13 @@
     return `M50 50L${p(a0)}A${R} ${R} 0 0 1 ${p(a1)}Z`;
   }
 
-  // fills: [{color, partial}] for the players who have the mark, in player order.
+  // fills: [{color}] for the players who have the mark, in player order.
   // state: 'known' | 'unknown'
   window.markSvg = function (icon, fills, state, hard) {
     const body = state === 'unknown'
       ? `<rect width="100" height="100" class="mk-unknown"/>`
       : `<rect width="100" height="100" class="mk-empty"/>` +
-        fills.map((f, i) => `<path d="${wedge(i, fills.length)}" fill="${f.color}"${f.partial ? ' fill-opacity=".5"' : ''}/>` +
-          (f.partial ? `<path d="${wedge(i, fills.length)}" fill="url(#hatch)"/>` : '')).join('');
+        fills.map((f, i) => `<path d="${wedge(i, fills.length)}" fill="${f.color}"/>`).join('');
     const done = fills.length > 0;
     const ink = state === 'unknown' || !done ? 'empty' : hard ? 'hard' : 'normal';
     return `<svg viewBox="-6 -6 112 112" class="mark-svg ${state}${done ? ' done' : ''}"><g filter="url(#rough)">

@@ -14,21 +14,29 @@
   ];
 
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pname = (p) => p.name || p.input;
+  const charById = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]));
+  const charByName = Object.fromEntries(CHARACTERS.map((c) => [c.name, c]));
 
   const state = {
+    view: 'marks',
     players: [],
     selected: 'isaac',
     filter: 'all',
     coopSort: false,
     hard: true,
+    chalFilter: 'all',
+    squad: { goals: {}, dupes: false },
   };
 
   // ---------- persistence ----------
   function save() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
+        view: state.view, selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
+        chalFilter: state.chalFilter, squad: state.squad,
         players: state.players.map((p) => ({
           input: p.input, path: p.path, color: p.color, name: p.name, avatar: p.avatar,
           unlocked: p.unlocked ? [...p.unlocked] : null, fetchedAt: p.fetchedAt,
@@ -40,7 +48,10 @@
     try {
       const d = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (!d) return;
-      Object.assign(state, { selected: d.selected || 'isaac', filter: d.filter || 'all', coopSort: !!d.coopSort, hard: d.hard !== false });
+      Object.assign(state, {
+        view: d.view || 'marks', selected: d.selected || 'isaac', filter: d.filter || 'all', coopSort: !!d.coopSort,
+        hard: d.hard !== false, chalFilter: d.chalFilter || 'all', squad: { goals: {}, dupes: false, ...(d.squad || {}) },
+      });
       state.players = (d.players || []).map((p) => ({ ...p, unlocked: p.unlocked ? new Set(p.unlocked) : null, status: p.unlocked ? 'ok' : 'idle' }));
     } catch (e) { /* ignore corrupt or blocked storage */ }
   }
@@ -48,7 +59,7 @@
   // ---------- Steam ----------
   function profilePath(input) {
     const s = input.trim();
-    let m = s.match(/steamcommunity\.com\/(profiles\/\d{17}|id\/[^/?#\s]+)/i);
+    const m = s.match(/steamcommunity\.com\/(profiles\/\d{17}|id\/[^/?#\s]+)/i);
     if (m) return m[1];
     if (/^\d{17}$/.test(s)) return `profiles/${s}`;
     if (/^[\w-]{2,64}$/.test(s)) return `id/${s}`;
@@ -118,23 +129,19 @@
   }
 
   // ---------- marks ----------
-  // Returns 'full' | 'partial' | 'none' | 'unknown' for one player's mark on a character.
-  function markState(ch, mark, p) {
-    const a = ch.ach;
-    if (mark.key === 'greed') {
-      if (!a.greedier && !a.greed) return 'unknown';
-      if (!p || !p.unlocked) return 'none';
-      if (a.greedier && p.unlocked.has(a.greedier)) return 'full';
-      if (a.greed && p.unlocked.has(a.greed)) return 'partial';
-      return 'none';
-    }
-    const id = a[mark.key];
-    if (!id) return 'unknown';
-    if (!p || !p.unlocked) return 'none';
-    return p.unlocked.has(id) ? 'full' : 'none';
-  }
-
   const loaded = () => state.players.filter((p) => p.unlocked);
+  const hasChar = (p, ch) => !ch.unlock || p.unlocked.has(ch.unlock);
+
+  function markIds(ch, mark) {
+    return (mark.ids || [mark.key]).map((k) => ch.ach[k]).filter(Boolean);
+  }
+  // 'done' | 'none' | 'unknown'
+  function markState(ch, mark, p) {
+    const ids = markIds(ch, mark);
+    if (!ids.length) return 'unknown';
+    if (!p || !p.unlocked) return 'none';
+    return ids.some((id) => p.unlocked.has(id)) ? 'done' : 'none';
+  }
 
   function score(ch, p) {
     let done = 0, total = 0;
@@ -142,23 +149,20 @@
       const s = markState(ch, m, p);
       if (s === 'unknown') continue;
       total++;
-      if (s !== 'none') done++;
+      if (s === 'done') done++;
     }
-    return { done, total };
+    return { done, total, missing: total - done };
   }
 
-  // Co-op value: how many (mark, player) pairs are still missing.
-  function coopValue(ch) {
-    return loaded().reduce((sum, p) => { const s = score(ch, p); return sum + s.total - s.done; }, 0);
-  }
+  const coopMissing = (ch) => loaded().reduce((sum, p) => sum + score(ch, p).missing, 0);
 
   function visibleChars() {
     let list = CHARACTERS.filter((c) => state.filter === 'all' || (state.filter === 'tainted') === c.tainted);
-    if (state.coopSort && loaded().length) list = [...list].sort((a, b) => coopValue(b) - coopValue(a));
+    if (state.coopSort && loaded().length) list = [...list].sort((a, b) => coopMissing(b) - coopMissing(a));
     return list;
   }
 
-  // ---------- rendering ----------
+  // ---------- rendering: players ----------
   function renderPlayers() {
     $('#players').innerHTML = state.players.map((p, i) => {
       const status = p.status === 'loading' ? 'loading…'
@@ -167,7 +171,7 @@
       return `<div class="player" data-i="${i}">
         <label class="swatch" style="background:${p.color}" title="Change color"><input type="color" value="${p.color}" data-act="color"></label>
         ${p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}
-        <div class="who"><span class="name">${esc(p.name || p.input)}</span><span class="status${p.status === 'error' ? ' err' : ''}">${status}</span></div>
+        <div class="who"><span class="name">${esc(pname(p))}</span><span class="status${p.status === 'error' ? ' err' : ''}">${status}</span></div>
         <button class="mini" data-act="reload" title="Refresh">↻</button>
         <button class="mini" data-act="remove" title="Remove">✕</button>
       </div>`;
@@ -178,6 +182,7 @@
     $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'Steam profile link or ID';
   }
 
+  // ---------- rendering: marks view ----------
   function renderCarousel() {
     const list = visibleChars();
     if (!list.some((c) => c.id === state.selected)) state.selected = list[0].id;
@@ -186,40 +191,48 @@
     for (const c of list) {
       if (!state.coopSort && state.filter === 'all' && c.tainted !== prevTainted) html += '<div class="divider" aria-hidden="true"></div>';
       prevTainted = c.tainted;
-      const pips = ps.map((p) => { const s = score(c, p); return `<div class="pip" title="${esc(p.name || p.input)}: ${s.done}/${s.total}"><i style="width:${(100 * s.done) / s.total}%;background:${p.color}"></i></div>`; }).join('');
+      const pips = ps.map((p) => {
+        const s = score(c, p), lock = !hasChar(p, c);
+        return `<div class="pip${lock ? ' locked' : ''}" title="${esc(pname(p))}: ${lock ? 'character locked' : `${s.done}/${s.total}`}"><i style="width:${(100 * s.done) / s.total}%;background:${p.color}"></i></div>`;
+      }).join('');
       html += `<button class="ccard${c.tainted ? ' tainted' : ''}${c.id === state.selected ? ' sel' : ''}" data-id="${c.id}" aria-pressed="${c.id === state.selected}">
         ${portraitSvg(c.portrait, c.tainted)}<div class="cname">${esc(c.name)}</div><div class="pips">${pips}</div></button>`;
     }
     $('#carousel').innerHTML = html;
-    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.filter === state.filter));
+    $$('#view-marks .tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.filter === state.filter));
     $('#sort-coop').checked = state.coopSort;
     $('#hard-mode').checked = state.hard;
   }
 
   function renderStage() {
-    const ch = CHARACTERS.find((c) => c.id === state.selected);
+    const ch = charById[state.selected];
     const ps = loaded();
 
-    const tally = ps.map((p) => { const s = score(ch, p); return `<li><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(p.name || p.input)}</span><span class="sc">${s.done}/${s.total}</span></li>`; }).join('');
+    const tally = ps.map((p) => {
+      const s = score(ch, p);
+      return `<li><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>${hasChar(p, ch) ? '' : '<span class="lock" title="Character not unlocked">🔒</span>'}<span class="sc">${s.done}/${s.total}</span></li>`;
+    }).join('');
+    const r = COOP[ch.id];
     $('#char-card').className = `char-card${ch.tainted ? ' tainted' : ''}`;
     $('#char-card').innerHTML = `${portraitSvg(ch.portrait, ch.tainted)}<h2>${esc(ch.name)}</h2>
-      <div class="sub">${ch.tainted ? 'Tainted character' : 'Character'}</div><ul class="tally">${tally}</ul>`;
+      <div class="sub">${ch.tainted ? 'Tainted character' : 'Character'}</div>
+      <div class="ratings">${ratingRow('Power', r.power, 5)}${ratingRow('Support', r.support, 5)}${ratingRow('Friction', r.friction, 3, true)}</div>
+      <ul class="tally">${tally}</ul>`;
 
-    let partialSeen = false, unknownSeen = false;
+    let unknownSeen = false;
     const slots = MARKS.map((m) => {
-      const per = ps.map((p) => ({ p, s: markState(ch, m, p) }));
       const unknown = markState(ch, m, null) === 'unknown';
       if (unknown) unknownSeen = true;
-      const fills = unknown ? [] : per.filter((x) => x.s === 'full' || x.s === 'partial').map((x) => ({ color: x.p.color, partial: x.s === 'partial' }));
-      if (fills.some((f) => f.partial)) partialSeen = true;
+      const per = ps.map((p) => ({ p, s: markState(ch, m, p) }));
+      const have = unknown ? [] : per.filter((x) => x.s === 'done');
       const missing = unknown ? [] : per.filter((x) => x.s === 'none');
-      const names = (arr) => arr.map((x) => (x.p.name || x.p.input) + (x.s === 'partial' ? ' (Greed only)' : '')).join(', ');
+      const names = (arr) => arr.map((x) => pname(x.p)).join(', ');
       const title = unknown
         ? `${m.label}: Steam has no achievement for this mark on ${ch.name}`
-        : `${m.label}\nDone: ${names(per.filter((x) => x.s !== 'none')) || 'nobody'}\nMissing: ${names(missing) || 'nobody'}`;
+        : `${m.label}\nDone: ${names(have) || 'nobody'}\nMissing: ${names(missing) || 'nobody'}`;
       const miss = missing.map((x) => `<span style="color:${x.p.color}">●</span>`).join('');
       return `<div class="slot${unknown ? ' unknown' : ''}" title="${esc(title)}">
-        ${markSvg(m.icon, fills, unknown ? 'unknown' : 'known', state.hard)}${unknown ? '<span class="q">?</span>' : ''}
+        ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', state.hard)}${unknown ? '<span class="q">?</span>' : ''}
         <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></div>`;
     }).join('');
 
@@ -227,16 +240,185 @@
       : !ps.length ? '<p class="empty-hint">Loading achievements…</p>' : '';
     const legend = [
       ps.length ? '<span>● under a mark = still missing for that player</span>' : '',
-      partialSeen ? '<span><span class="sw" style="background:repeating-linear-gradient(45deg,#999 0 3px,#ddd 3px 6px)"></span>Greed only (not Greedier)</span>' : '',
       unknownSeen ? '<span>? = not tracked by Steam for tainted characters</span>' : '',
     ].join('');
     $('#note').innerHTML = `${hint}<div class="note-grid">${slots}</div><div class="legend">${legend}</div>`;
   }
 
+  function ratingRow(label, v, max, bad) {
+    let dots = '';
+    for (let i = 1; i <= max; i++) dots += `<i class="${i <= v ? (bad ? 'on bad' : 'on') : ''}"></i>`;
+    return `<span class="rating" title="${label} ${v}/${max}"><b>${label}</b><span class="dots">${dots}</span></span>`;
+  }
+
+  // ---------- rendering: challenges view ----------
+  function chalStatus(c, p) {
+    if (c.done && p.unlocked.has(c.done)) return 'done';
+    const open = c.req.every((group) => group.some((id) => p.unlocked.has(id)));
+    return open ? 'open' : 'lock';
+  }
+
+  function renderChallenges() {
+    const ps = loaded();
+    $$('#chal-filter .tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.f === state.chalFilter));
+    if (!ps.length) { $('#chal-list').innerHTML = '<p class="empty-hint light">Add a player to see challenge progress.</p>'; return; }
+    const rows = CHALLENGES.map((c) => ({ c, st: ps.map((p) => ({ p, s: chalStatus(c, p) })) }))
+      .filter(({ st }) => {
+        const all = (s) => st.every((x) => x.s === s);
+        const some = (s) => st.some((x) => x.s === s);
+        switch (state.chalFilter) {
+          case 'ready': return !some('lock') && !all('done');
+          case 'todo': return !all('done');
+          case 'locked': return some('lock');
+          default: return true;
+        }
+      });
+    $('#chal-list').innerHTML = rows.map(({ c, st }) => {
+      const ch = charByName[c.char] || charById.isaac;
+      const ready = !st.some((x) => x.s === 'lock') && !st.every((x) => x.s === 'done');
+      const chips = st.map(({ p, s }) => {
+        const label = s === 'done' ? 'beaten' : s === 'open' ? 'unlocked, not beaten' : 'locked';
+        return `<span class="chip ${s}" style="--pc:${p.color}" title="${esc(pname(p))}: ${label}">${s === 'done' ? '✓' : s === 'lock' ? '🔒' : ''}<em>${esc(pname(p))}</em></span>`;
+      }).join('');
+      const req = c.req.length ? `Unlock: ${esc(c.reqText)}` : 'Available from the start';
+      return `<article class="chal${ready ? ' ready' : ''}">
+        <div class="chal-num">${c.n}</div>
+        ${portraitSvg(ch.portrait, ch.tainted)}
+        <div class="chal-body">
+          <h3>${esc(c.name)}${ready ? '<span class="tag">ready for co-op</span>' : ''}</h3>
+          <div class="chal-meta">${esc(c.char)} · goal: ${esc(c.goal)} · reward: ${esc(c.reward)}</div>
+          <div class="chal-req">${req}</div>
+        </div>
+        <div class="chips">${chips}</div>
+      </article>`;
+    }).join('') || '<p class="empty-hint light">Nothing matches this filter.</p>';
+  }
+
+  // ---------- squad builder ----------
+  function buildSquads() {
+    const ps = loaded();
+    const M = SQUAD_MODEL;
+    const cands = ps.map((p) => {
+      const goal = state.squad.goals[p.path] || 'auto';
+      const role = goal === 'auto' || goal === 'carry' ? goal : 'pick';
+      const weight = M.ROLE_WEIGHT[role];
+      let chars = role === 'pick' ? [charById[goal]].filter((c) => c && hasChar(p, c)) : CHARACTERS.filter((c) => hasChar(p, c));
+      const info = (c) => ({ c, gain: Math.min(score(c, p).missing, M.RUN_CAP), weight });
+      let list = chars.map(info);
+      if (role !== 'pick') {
+        // Pre-rank to keep the search small: marks to gain plus how much the character helps a team.
+        const r = (x) => COOP[x.c.id];
+        list.sort((a, b) => (b.weight * b.gain + 0.8 * r(b).power + 0.6 * r(b).support - 0.5 * r(b).friction)
+          - (a.weight * a.gain + 0.8 * r(a).power + 0.6 * r(a).support - 0.5 * r(a).friction));
+        list = list.slice(0, 10);
+      }
+      return { p, role, list };
+    });
+    if (cands.some((x) => !x.list.length)) return [];
+
+    const best = [];
+    const pick = new Array(cands.length);
+    (function walk(i) {
+      if (i === cands.length) {
+        const chars = pick.map((x) => x.c);
+        if (!state.squad.dupes && new Set(chars.map((c) => c.id)).size < chars.length) return;
+        const win = M.winChance(chars);
+        const value = win * pick.reduce((s, x) => s + x.weight * x.gain, 0) + 0.05 * win;
+        if (best.length < 5 || value > best[best.length - 1].value) {
+          best.push({ value, win, members: pick.map((x, k) => ({ p: cands[k].p, role: cands[k].role, ...x })) });
+          best.sort((a, b) => b.value - a.value);
+          if (best.length > 5) best.pop();
+        }
+        return;
+      }
+      for (const x of cands[i].list) { pick[i] = x; walk(i + 1); }
+    })(0);
+    return best;
+  }
+
+  function renderSquad() {
+    const ps = loaded();
+    if (!ps.length) {
+      $('#squad-controls').innerHTML = '<p class="empty-hint light">Add players to build a squad.</p>';
+      $('#squad-results').innerHTML = '';
+    } else {
+      $('#squad-controls').innerHTML = ps.map((p) => {
+        const goal = state.squad.goals[p.path] || 'auto';
+        const opt = (c) => {
+          const s = score(c, p), lock = !hasChar(p, c);
+          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${esc(c.name)} — ${lock ? 'locked' : `${s.missing} missing`}</option>`;
+        };
+        return `<label class="goal" style="--pc:${p.color}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>
+          <select data-path="${esc(p.path)}">
+            <option value="auto"${goal === 'auto' ? ' selected' : ''}>Auto: best marks for me</option>
+            <option value="carry"${goal === 'carry' ? ' selected' : ''}>Carry: help the team win</option>
+            <optgroup label="Hunt marks on…">${CHARACTERS.filter((c) => !c.tainted).map(opt).join('')}</optgroup>
+            <optgroup label="Hunt marks on… (tainted)">${CHARACTERS.filter((c) => c.tainted).map(opt).join('')}</optgroup>
+          </select></label>`;
+      }).join('') + `<label class="check dark"><input type="checkbox" id="squad-dupes"${state.squad.dupes ? ' checked' : ''}> Allow the same character twice</label>`;
+
+      const squads = buildSquads();
+      $('#squad-results').innerHTML = squads.length ? squads.map((sq, i) => `
+        <article class="squad${i === 0 ? ' best' : ''}">
+          <div class="squad-head">
+            <span class="rank">#${i + 1}</span>
+            <span class="win" title="Estimated chance the team wins the run">win chance <b>${Math.round(sq.win * 100)}%</b><span class="bar"><i style="width:${sq.win * 100}%"></i></span></span>
+            <span class="ev" title="Win chance × marks the squad can still get (weighted by goal)">value ${sq.value.toFixed(1)}</span>
+          </div>
+          <div class="members">${sq.members.map((m) => {
+            const r = COOP[m.c.id];
+            return `<button class="member" data-char="${m.c.id}" style="--pc:${m.p.color}" title="${esc(r.note)}">
+              ${portraitSvg(m.c.portrait, m.c.tainted)}
+              <span class="m-player">${esc(pname(m.p))}${m.role === 'carry' ? ' · carry' : m.role === 'pick' ? ' · hunting' : ''}</span>
+              <span class="m-char">${esc(m.c.name)}</span>
+              <span class="m-gain">${m.gain ? `+${m.gain} mark${m.gain > 1 ? 's' : ''} possible` : 'no marks left'}</span>
+              <span class="m-tags">${r.support >= 3 ? '<em class="t-sup">team support</em>' : ''}${r.power >= 4 ? '<em class="t-pow">carry</em>' : ''}${r.power <= 1 ? '<em class="t-hard">fragile</em>' : ''}${r.friction >= 2 ? '<em class="t-fri">gets in the way</em>' : ''}</span>
+            </button>`;
+          }).join('')}</div>
+        </article>`).join('') : '<p class="empty-hint light">No squad possible: a picked character is locked for that player.</p>';
+    }
+
+    const tiers = [...CHARACTERS].sort((a, b) => {
+      const ra = COOP[a.id], rb = COOP[b.id];
+      return (rb.power + rb.support * 1.2 - rb.friction) - (ra.power + ra.support * 1.2 - ra.friction);
+    });
+    $('#tier-list').innerHTML = tiers.map((c) => {
+      const r = COOP[c.id];
+      return `<div class="tier" data-char="${c.id}">${portraitSvg(c.portrait, c.tainted)}
+        <div class="tier-body"><b>${esc(c.name)}</b>
+          <div class="ratings">${ratingRow('Power', r.power, 5)}${ratingRow('Support', r.support, 5)}${ratingRow('Friction', r.friction, 3, true)}</div>
+          <p>${esc(r.note)}</p></div></div>`;
+    }).join('');
+  }
+
+  // ---------- views ----------
+  function renderView() {
+    if (state.view === 'marks') { renderCarousel(); renderStage(); }
+    if (state.view === 'challenges') renderChallenges();
+    if (state.view === 'squad') renderSquad();
+  }
+
   function render() {
     renderPlayers();
-    renderCarousel();
-    renderStage();
+    renderView();
+  }
+
+  function showView(view, animate = true) {
+    const swap = () => {
+      state.view = view;
+      $$('.view').forEach((v) => { v.hidden = v.id !== `view-${view}`; });
+      $$('.view-btn').forEach((b) => b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'));
+      renderView();
+      if (view === 'marks') scrollToSelected('instant');
+      save();
+    };
+    if (animate && document.startViewTransition && view !== state.view) document.startViewTransition(swap);
+    else swap();
+  }
+
+  function scrollToSelected(behavior) {
+    const el = document.querySelector(`.ccard[data-id="${state.selected}"]`);
+    if (el) el.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
   }
 
   function select(id, scroll = 'smooth') {
@@ -244,10 +426,7 @@
     save();
     renderCarousel();
     renderStage();
-    if (scroll) {
-      const el = document.querySelector(`.ccard[data-id="${id}"]`);
-      if (el) el.scrollIntoView({ behavior: scroll, inline: 'center', block: 'nearest' });
-    }
+    if (scroll) scrollToSelected(scroll);
   }
 
   function step(dir) {
@@ -257,6 +436,8 @@
   }
 
   // ---------- events ----------
+  $$('.view-btn').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
+
   $('#add-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const input = $('#add-input').value;
@@ -284,10 +465,9 @@
     const p = state.players[+e.target.closest('.player').dataset.i];
     p.color = e.target.value;
     e.target.parentElement.style.background = p.color;
-    renderCarousel();
-    renderStage();
+    renderView();
   });
-  $('#players').addEventListener('change', (e) => { if (e.target.dataset.act === 'color') { save(); render(); } });
+  $('#players').addEventListener('change', (e) => { if (e.target.dataset.act === 'color') save(); });
 
   $('#carousel').addEventListener('click', (e) => {
     const card = e.target.closest('.ccard');
@@ -299,13 +479,36 @@
   });
   $('#prev').addEventListener('click', () => step(-1));
   $('#next').addEventListener('click', () => step(1));
-  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => { state.filter = t.dataset.filter; save(); render(); select(state.selected); }));
-  $('#sort-coop').addEventListener('change', (e) => { state.coopSort = e.target.checked; save(); render(); select(state.selected); });
+  $$('#view-marks .tab').forEach((t) => t.addEventListener('click', () => { state.filter = t.dataset.filter; save(); select(state.selected); }));
+  $('#sort-coop').addEventListener('change', (e) => { state.coopSort = e.target.checked; save(); select(state.selected); });
   $('#hard-mode').addEventListener('change', (e) => { state.hard = e.target.checked; save(); renderStage(); });
+
+  $('#chal-filter').addEventListener('click', (e) => {
+    const t = e.target.closest('.tab');
+    if (!t) return;
+    state.chalFilter = t.dataset.f;
+    save();
+    renderChallenges();
+  });
+
+  $('#view-squad').addEventListener('change', (e) => {
+    if (e.target.matches('select[data-path]')) state.squad.goals[e.target.dataset.path] = e.target.value;
+    else if (e.target.id === 'squad-dupes') state.squad.dupes = e.target.checked;
+    else return;
+    save();
+    renderSquad();
+  });
+  $('#view-squad').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-char]');
+    if (!el) return;
+    state.selected = el.dataset.char;
+    if (!visibleChars().some((c) => c.id === state.selected)) state.filter = 'all';
+    showView('marks');
+  });
 
   // ---------- start ----------
   load();
-  render();
-  select(state.selected, 'instant');
+  renderPlayers();
+  showView(state.view, false);
   state.players.filter((p) => !p.unlocked).forEach(loadPlayer);
 })();

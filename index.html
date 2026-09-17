@@ -13,6 +13,11 @@
 <body>
   <header class="top">
     <h1 class="title">Co-op <span>Marks</span></h1>
+    <nav class="views" aria-label="Views">
+      <button class="view-btn" data-view="marks">Marks</button>
+      <button class="view-btn" data-view="challenges">Challenges</button>
+      <button class="view-btn" data-view="squad">Squad</button>
+    </nav>
     <div class="players" id="players"></div>
     <form class="add-player" id="add-form" autocomplete="off">
       <input id="add-input" type="text" placeholder="Steam profile link or ID" aria-label="Steam profile link or ID">
@@ -20,33 +25,67 @@
     </form>
   </header>
 
-  <section class="select">
-    <div class="select-bar">
-      <div class="tabs" role="tablist">
-        <button class="tab" data-filter="all" role="tab">All</button>
-        <button class="tab" data-filter="normal" role="tab">Normal</button>
-        <button class="tab" data-filter="tainted" role="tab">Tainted</button>
+  <div class="view" id="view-marks">
+    <section class="select">
+      <div class="select-bar">
+        <div class="tabs" role="tablist">
+          <button class="tab" data-filter="all" role="tab">All</button>
+          <button class="tab" data-filter="normal" role="tab">Normal</button>
+          <button class="tab" data-filter="tainted" role="tab">Tainted</button>
+        </div>
+        <label class="check"><input type="checkbox" id="sort-coop"> Most missing first</label>
+        <label class="check"><input type="checkbox" id="hard-mode" checked> Assume Hard mode</label>
       </div>
-      <label class="check"><input type="checkbox" id="sort-coop"> Co-op picks first</label>
-      <label class="check"><input type="checkbox" id="hard-mode" checked> Assume Hard mode</label>
-    </div>
-    <div class="carousel-wrap">
-      <button class="nav prev" id="prev" aria-label="Previous character">‹</button>
-      <div class="carousel" id="carousel" tabindex="0"></div>
-      <button class="nav next" id="next" aria-label="Next character">›</button>
-    </div>
-  </section>
+      <div class="carousel-wrap">
+        <button class="nav prev" id="prev" aria-label="Previous character">‹</button>
+        <div class="carousel" id="carousel" tabindex="0"></div>
+        <button class="nav next" id="next" aria-label="Next character">›</button>
+      </div>
+    </section>
+    <main class="stage">
+      <div class="char-card" id="char-card"></div>
+      <div class="note" id="note"></div>
+    </main>
+  </div>
 
-  <main class="stage">
-    <div class="char-card" id="char-card"></div>
-    <div class="note" id="note"></div>
-  </main>
+  <div class="view" id="view-challenges" hidden>
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>Challenges</h2>
+        <div class="tabs" id="chal-filter">
+          <button class="tab" data-f="all">All</button>
+          <button class="tab" data-f="ready">Ready for co-op</button>
+          <button class="tab" data-f="todo">Someone needs it</button>
+          <button class="tab" data-f="locked">Locked for someone</button>
+        </div>
+      </div>
+      <p class="sheet-sub">
+        <span class="chip-demo lock">🔒</span> locked &nbsp; <span class="chip-demo open"></span> unlocked, not beaten &nbsp; <span class="chip-demo done">✓</span> beaten.
+        In co-op every player plays the challenge's character.
+      </p>
+      <div id="chal-list" class="chal-list"></div>
+    </section>
+  </div>
+
+  <div class="view" id="view-squad" hidden>
+    <section class="sheet">
+      <div class="sheet-head"><h2>Squad builder</h2></div>
+      <p class="sheet-sub">Pick what each player wants. The builder weighs marks still to get against the chance the team actually wins the run, using the co-op ratings below.</p>
+      <div id="squad-controls" class="squad-controls"></div>
+      <div id="squad-results" class="squad-results"></div>
+      <h3 class="sheet-h3">Co-op ratings</h3>
+      <p class="sheet-sub">Power = how easily they win. Support = how much they help teammates. Friction = how much they get in the way. Edit in <code>js/coop.js</code>.</p>
+      <div id="tier-list" class="tier-list"></div>
+    </section>
+  </div>
 
   <footer class="foot">
     Data: public Steam achievements (profile and game details must be public). Not affiliated with Nicalis or Edmund McMillen.
   </footer>
 
   <script src="js/data.js"></script>
+  <script src="js/challenges.js"></script>
+  <script src="js/coop.js"></script>
   <script src="js/art.js"></script>
   <script src="js/app.js"></script>
 </body>
