@@ -676,3 +676,17 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
     font-size: 14px;
   }
 }
+
+/* ---------- recently checked players ---------- */
+.recent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; }
+.recent[hidden] { display: none; }
+.recent-label { color: var(--paper-dark); font-size: 15px; }
+.recent-item { display: inline-flex; align-items: center; background: rgba(232,219,193,.12); border: 2px solid rgba(232,219,193,.45); border-radius: 16px; }
+.recent-item:hover { border-color: var(--paper); }
+.recent-add { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 3px; background: none; border: 0; color: var(--paper); cursor: pointer; font-size: 16px; }
+.recent-add:disabled { opacity: .5; cursor: default; }
+.recent-add img { width: 22px; height: 22px; border-radius: 50%; }
+.recent-add span { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-forget { background: none; border: 0; color: var(--paper-dark); cursor: pointer; padding: 0 8px 0 2px; font-size: 13px; }
+.recent-forget:hover { color: #ff6b5b; }
+@media (max-width: 760px) { .recent-add, .recent-forget { min-height: 40px; } }

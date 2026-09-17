@@ -72,7 +72,12 @@
       if (!path || state.players.some((p) => p.path.toLowerCase() === path.toLowerCase())) continue;
       const hit = saved.find((p) => p.path.toLowerCase() === path.toLowerCase() || p.sid === id);
       const used = state.players.map((p) => p.color);
-      state.players.push(hit || { input: id, path, color: COLORS.find((c) => !used.includes(c)) || COLORS[0], unlocked: null, status: 'idle' });
+      const color = COLORS.find((c) => !used.includes(c)) || COLORS[0];
+      // Not in the saved list: reuse recently checked data (shown at once, refreshed after load).
+      const rec = !hit && recent.find((r) => samePlayer(r, { path, sid: /^\d{17}$/.test(id) ? id : undefined }));
+      state.players.push(hit || (rec
+        ? { input: id, path, sid: rec.sid, name: rec.name, avatar: rec.avatar, color, unlocked: new Set(rec.unlocked), fetchedAt: rec.fetchedAt, status: 'stale' }
+        : { input: id, path, color, unlocked: null, status: 'idle' }));
     }
   }
   function load() {
@@ -154,6 +159,7 @@
         const sid = tag(prof, 'steamID64');
         if (/^\d{17}$/.test(sid || '')) p.sid = sid;
       } catch (e) { /* name/avatar are optional */ }
+      rememberPlayer(p);
       const pct = overallProgress(p);
       showToast(`✓ ${pname(p)} loaded: ${pct}% of all marks`, 'ok');
     } catch (e) {
@@ -248,6 +254,37 @@
     $('#add-input').disabled = full;
     $('#add-form button').disabled = full;
     $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'steamcommunity.com/id/NAME or 76561198…';
+    renderRecent();
+  }
+
+  // ---------- recently checked players (kept in this browser, max 12) ----------
+  const RECENT_KEY = 'isaac-coop-marks.recent';
+  const MAX_RECENT = 12;
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { recent = []; }
+
+  const samePlayer = (a, b) => a.path.toLowerCase() === b.path.toLowerCase() || (!!a.sid && a.sid === b.sid);
+
+  function saveRecent() {
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) { /* storage unavailable */ }
+  }
+
+  function rememberPlayer(p) {
+    const entry = { path: p.sid ? `profiles/${p.sid}` : p.path, sid: p.sid, name: pname(p), avatar: p.avatar, unlocked: [...p.unlocked], fetchedAt: p.fetchedAt };
+    recent = [entry, ...recent.filter((r) => !samePlayer(r, p))].slice(0, MAX_RECENT);
+    saveRecent();
+  }
+
+  function renderRecent() {
+    const list = recent.map((r, i) => ({ r, i })).filter(({ r }) => !state.players.some((p) => samePlayer(r, p)));
+    const full = state.players.length >= MAX_PLAYERS;
+    $('#recent').hidden = !list.length;
+    $('#recent').innerHTML = list.length ? `<span class="recent-label">Recent:</span>${list.map(({ r, i }) => `
+      <span class="recent-item">
+        <button class="recent-add" data-recent="${i}"${full ? ' disabled' : ''} title="${full ? `Max ${MAX_PLAYERS} players` : `Add ${esc(r.name)} again`}">
+          ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(r.name)}</span>
+        </button><button class="recent-forget" data-forget="${i}" aria-label="Forget ${esc(r.name)}" title="Forget">✕</button>
+      </span>`).join('')}` : '';
   }
 
   // ---------- rendering: marks view ----------
@@ -726,11 +763,31 @@
     loadPlayer(p);
   });
 
+  $('#recent').addEventListener('click', (e) => {
+    const forget = e.target.closest('[data-forget]');
+    if (forget) { recent.splice(+forget.dataset.forget, 1); saveRecent(); renderRecent(); return; }
+    const add = e.target.closest('[data-recent]');
+    if (!add || state.players.length >= MAX_PLAYERS) return;
+    const r = recent[+add.dataset.recent];
+    const used = state.players.map((p) => p.color);
+    // Show the saved data right away, then refresh it from Steam.
+    const p = { input: r.sid || r.path.split('/')[1], path: r.path, sid: r.sid, name: r.name, avatar: r.avatar,
+      color: COLORS.find((c) => !used.includes(c)) || COLORS[0], unlocked: new Set(r.unlocked), fetchedAt: r.fetchedAt, status: 'ok' };
+    state.players.push(p);
+    save();
+    loadPlayer(p);
+  });
+
   $('#players').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn || btn.dataset.act === 'color') return;
     const i = +btn.closest('.player').dataset.i;
-    if (btn.dataset.act === 'remove') { state.players.splice(i, 1); save(); render(); }
+    if (btn.dataset.act === 'remove') {
+      const gone = state.players.splice(i, 1)[0];
+      if (gone.unlocked) rememberPlayer(gone);
+      save();
+      render();
+    }
     if (btn.dataset.act === 'reload') loadPlayer(state.players[i]);
   });
   $('#players').addEventListener('input', (e) => {
@@ -860,9 +917,10 @@
   load();
   readUrl();
   writeUrl();
+  [...loaded()].reverse().forEach(rememberPlayer);
   renderPlayers();
   showView(state.view, false);
-  state.players.filter((p) => !p.unlocked).forEach(loadPlayer);
+  state.players.filter((p) => !p.unlocked || p.status === 'stale').forEach(loadPlayer);
   let introSeen = false;
   try { introSeen = !!localStorage.getItem(INTRO_KEY); } catch (e) { /* storage blocked: show it */ }
   if (!introSeen) $('#intro').showModal();
