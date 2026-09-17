@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Isaac Co-op Marks</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gochi+Hand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1 class="title">Co-op <span>Marks</span></h1>
+    <div class="players" id="players"></div>
+    <form class="add-player" id="add-form" autocomplete="off">
+      <input id="add-input" type="text" placeholder="Steam profile link or ID" aria-label="Steam profile link or ID">
+      <button type="submit" class="btn">+ Add player</button>
+    </form>
+  </header>
+
+  <section class="select">
+    <div class="select-bar">
+      <div class="tabs" role="tablist">
+        <button class="tab" data-filter="all" role="tab">All</button>
+        <button class="tab" data-filter="normal" role="tab">Normal</button>
+        <button class="tab" data-filter="tainted" role="tab">Tainted</button>
+      </div>
+      <label class="check"><input type="checkbox" id="sort-coop"> Co-op picks first</label>
+      <label class="check"><input type="checkbox" id="hard-mode" checked> Assume Hard mode</label>
+    </div>
+    <div class="carousel-wrap">
+      <button class="nav prev" id="prev" aria-label="Previous character">‹</button>
+      <div class="carousel" id="carousel" tabindex="0"></div>
+      <button class="nav next" id="next" aria-label="Next character">›</button>
+    </div>
+  </section>
+
+  <main class="stage">
+    <div class="char-card" id="char-card"></div>
+    <div class="note" id="note"></div>
+  </main>
+
+  <footer class="foot">
+    Data: public Steam achievements (profile and game details must be public). Not affiliated with Nicalis or Edmund McMillen.
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
