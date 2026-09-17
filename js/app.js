@@ -38,11 +38,41 @@
         view: state.view, selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
         chalFilter: state.chalFilter, squad: state.squad,
         players: state.players.map((p) => ({
-          input: p.input, path: p.path, color: p.color, name: p.name, avatar: p.avatar,
+          input: p.input, path: p.path, sid: p.sid, color: p.color, name: p.name, avatar: p.avatar,
           unlocked: p.unlocked ? [...p.unlocked] : null, fetchedAt: p.fetchedAt,
         })),
       }));
     } catch (e) { /* storage unavailable: app still works for this visit */ }
+    writeUrl();
+  }
+
+  // ---------- shareable link: ?p1=<steamID64 or custom URL name>&p2=… ----------
+  const urlId = (p) => p.sid || (p.path.startsWith('profiles/') ? p.path.slice(9) : p.path.slice(3));
+
+  function writeUrl() {
+    const q = new URLSearchParams(location.search);
+    for (let i = 1; i <= MAX_PLAYERS; i++) q.delete(`p${i}`);
+    state.players.forEach((p, i) => q.set(`p${i + 1}`, urlId(p)));
+    const search = q.toString();
+    const url = `${location.pathname}${search ? `?${search}` : ''}${location.hash}`;
+    if (url !== `${location.pathname}${location.search}${location.hash}`) history.replaceState(null, '', url);
+  }
+
+  // Players in the link win over the saved list; saved data for the same profile is reused.
+  function readUrl() {
+    const q = new URLSearchParams(location.search);
+    const ids = [];
+    for (let i = 1; i <= MAX_PLAYERS; i++) { const v = (q.get(`p${i}`) || '').trim(); if (v) ids.push(v); }
+    if (!ids.length) return;
+    const saved = state.players;
+    state.players = [];
+    for (const id of ids) {
+      const path = profilePath(id);
+      if (!path || state.players.some((p) => p.path.toLowerCase() === path.toLowerCase())) continue;
+      const hit = saved.find((p) => p.path.toLowerCase() === path.toLowerCase() || p.sid === id);
+      const used = state.players.map((p) => p.color);
+      state.players.push(hit || { input: id, path, color: COLORS.find((c) => !used.includes(c)) || COLORS[0], unlocked: null, status: 'idle' });
+    }
   }
   function load() {
     try {
@@ -119,6 +149,8 @@
         const prof = await relayFetch(`${base}/?xml=1`, (t) => /<profile|<steamid>/i.test(t));
         p.name = tag(prof, 'steamID') || p.name;
         p.avatar = tag(prof, 'avatarMedium') || p.avatar;
+        const sid = tag(prof, 'steamID64');
+        if (/^\d{17}$/.test(sid || '')) p.sid = sid;
       } catch (e) { /* name/avatar are optional */ }
     } catch (e) {
       p.status = 'error';
@@ -216,7 +248,7 @@
     $('#char-card').className = `char-card${ch.tainted ? ' tainted' : ''}`;
     $('#char-card').innerHTML = `${portraitSvg(ch.portrait, ch.tainted)}<h2>${esc(ch.name)}</h2>
       <div class="sub">${ch.tainted ? 'Tainted character' : 'Character'}</div>
-      <div class="ratings">${ratingRow('Power', r.power, 5)}${ratingRow('Support', r.support, 5)}${ratingRow('Friction', r.friction, 3, true)}</div>
+      ${statBars(r)}
       <ul class="tally">${tally}</ul>`;
 
     let unknownSeen = false;
@@ -226,29 +258,67 @@
       const per = ps.map((p) => ({ p, s: markState(ch, m, p) }));
       const have = unknown ? [] : per.filter((x) => x.s === 'done');
       const missing = unknown ? [] : per.filter((x) => x.s === 'none');
-      const names = (arr) => arr.map((x) => pname(x.p)).join(', ');
-      const title = unknown
-        ? `${m.label}: Steam has no achievement for this mark on ${ch.name}`
-        : `${m.label}\nDone: ${names(have) || 'nobody'}\nMissing: ${names(missing) || 'nobody'}`;
       const miss = missing.map((x) => `<span style="color:${x.p.color}">●</span>`).join('');
-      return `<div class="slot${unknown ? ' unknown' : ''}" title="${esc(title)}">
+      return `<button class="slot${unknown ? ' unknown' : ''}" data-mark="${m.key}" title="${esc(m.label)}: see what it unlocks">
         ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', state.hard)}${unknown ? '<span class="q">?</span>' : ''}
-        <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></div>`;
+        <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></button>`;
     }).join('');
 
     const hint = !state.players.length ? '<p class="empty-hint">Add a player above to fill in the marks.</p>'
       : !ps.length ? '<p class="empty-hint">Loading achievements…</p>' : '';
     const legend = [
+      '<span>click a mark to see what it unlocks</span>',
       ps.length ? '<span>● under a mark = still missing for that player</span>' : '',
       unknownSeen ? '<span>? = not tracked by Steam for tainted characters</span>' : '',
     ].join('');
     $('#note').innerHTML = `${hint}<div class="note-grid">${slots}</div><div class="legend">${legend}</div>`;
   }
 
-  function ratingRow(label, v, max, bad) {
-    let dots = '';
-    for (let i = 1; i <= max; i++) dots += `<i class="${i <= v ? (bad ? 'on bad' : 'on') : ''}"></i>`;
-    return `<span class="rating" title="${label} ${v}/${max}"><b>${label}</b><span class="dots">${dots}</span></span>`;
+  // Five 0–5 stat bars; Team cost and Skill are "lower is better" and drawn in red.
+  function statBars(r) {
+    return `<div class="stats">${Object.entries(STAT_INFO).map(([k, info]) => {
+      const bad = k === 'cost' || k === 'skill';
+      let dots = '';
+      for (let i = 1; i <= 5; i++) dots += `<i class="${i <= r[k] ? (bad ? 'on bad' : 'on') : ''}"></i>`;
+      return `<span class="stat" title="${esc(info.label)} ${r[k]}/5: ${esc(info.q)}"><b>${esc(info.label)}</b><span class="dots">${dots}</span></span>`;
+    }).join('')}</div>`;
+  }
+
+  // ---------- unlock details ----------
+  const STEAM_ICON = 'https://shared.akamai.steamstatic.com/community_assets/images/apps/250900/';
+  const TAINTED_SHARED = { isaac: 'Isaac, ???, Satan and The Lamb', bluebaby: 'Isaac, ???, Satan and The Lamb', satan: 'Isaac, ???, Satan and The Lamb', lamb: 'Isaac, ???, Satan and The Lamb', bossrush: 'Boss Rush and Hush', hush: 'Boss Rush and Hush' };
+
+  function openUnlock(markKey) {
+    const ch = charById[state.selected];
+    const m = MARKS.find((x) => x.key === markKey);
+    const ids = markIds(ch, m);
+    let html;
+    if (!ids.length) {
+      html = `<p class="u-kind">${esc(m.label)} · ${esc(ch.name)}</p><h3>No unlock</h3>
+        <p>Tainted characters get nothing for this mark, so Steam has no achievement for it and the app can't tell who has it.</p>`;
+    } else {
+      // Greed slot: the Greed achievement is the unlock; Greedier only proves the mark.
+      const id = ids[0];
+      const u = UNLOCKS[id] || { n: 'Unknown unlock', k: '', d: '' };
+      const ps = loaded();
+      const who = ps.map((p) => {
+        const s = markState(ch, m, p);
+        return `<span class="chip ${s === 'done' ? 'done' : 'open'}" style="--pc:${p.color}">${s === 'done' ? '✓' : ''}<em>${esc(pname(p))}</em></span>`;
+      }).join('');
+      const shared = ch.tainted && TAINTED_SHARED[m.key]
+        ? `<p class="u-note">For tainted characters this one unlock needs all of: ${TAINTED_SHARED[m.key]}.</p>` : '';
+      const greedNote = m.key === 'greed' && ch.tainted ? '<p class="u-note">Tainted characters only get an unlock for Greedier, which also gives the Greed mark.</p>' : '';
+      html = `<div class="u-head">
+          ${u.i ? `<img src="${STEAM_ICON}${esc(u.i)}" alt="" width="64" height="64" referrerpolicy="no-referrer">` : ''}
+          <div><p class="u-kind">${esc(m.label)} · ${esc(ch.name)}</p><h3>${esc(u.n)}</h3>${u.k ? `<span class="u-type">${esc(u.k)}</span>` : ''}</div>
+        </div>
+        ${u.q ? `<p class="u-quote">“${esc(u.q)}”</p>` : ''}
+        <p>${esc(u.d)}</p>${shared}${greedNote}
+        ${who ? `<div class="chips u-who">${who}</div>` : ''}
+        ${u.w ? `<a class="u-wiki" href="https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(u.w.replace(/ /g, '_'))}" target="_blank" rel="noopener">Open on the wiki ↗</a>` : ''}`;
+    }
+    $('#unlock-body').innerHTML = html;
+    $('#unlock').showModal();
   }
 
   // ---------- rendering: challenges view ----------
@@ -295,6 +365,12 @@
   }
 
   // ---------- squad builder ----------
+  // How much a character adds to a team on its own (same weights as the win-chance rating).
+  function soloValue(c) {
+    const r = COOP[c.id];
+    return 0.45 * r.dmg + 0.35 * r.surv + 0.3 * r.help - 0.2 * r.cost - 0.25 * Math.max(0, r.skill - 2.5);
+  }
+
   function buildSquads() {
     const ps = loaded();
     const M = SQUAD_MODEL;
@@ -306,11 +382,10 @@
       const info = (c) => ({ c, gain: Math.min(score(c, p).missing, M.RUN_CAP), weight });
       let list = chars.map(info);
       if (role !== 'pick') {
-        // Pre-rank to keep the search small: marks to gain plus how much the character helps a team.
-        const r = (x) => COOP[x.c.id];
-        list.sort((a, b) => (b.weight * b.gain + 0.8 * r(b).power + 0.6 * r(b).support - 0.5 * r(b).friction)
-          - (a.weight * a.gain + 0.8 * r(a).power + 0.6 * r(a).support - 0.5 * r(a).friction));
-        list = list.slice(0, 10);
+        // Keep the search small: the best characters for this player's marks, plus the best team picks.
+        const byMarks = [...list].sort((x, y) => (y.gain + soloValue(y.c)) - (x.gain + soloValue(x.c))).slice(0, 8);
+        const byTeam = [...list].sort((x, y) => soloValue(y.c) - soloValue(x.c)).slice(0, 6);
+        list = [...new Set([...byMarks, ...byTeam])];
       }
       return { p, role, list };
     });
@@ -322,10 +397,10 @@
       if (i === cands.length) {
         const chars = pick.map((x) => x.c);
         if (!state.squad.dupes && new Set(chars.map((c) => c.id)).size < chars.length) return;
-        const win = M.winChance(chars);
-        const value = win * pick.reduce((s, x) => s + x.weight * x.gain, 0) + 0.05 * win;
+        const why = M.breakdown(chars);
+        const value = why.win * pick.reduce((s, x) => s + x.weight * x.gain, 0) + 0.05 * why.win;
         if (best.length < 5 || value > best[best.length - 1].value) {
-          best.push({ value, win, members: pick.map((x, k) => ({ p: cands[k].p, role: cands[k].role, ...x })) });
+          best.push({ value, win: why.win, why, members: pick.map((x, k) => ({ p: cands[k].p, role: cands[k].role, ...x })) });
           best.sort((a, b) => b.value - a.value);
           if (best.length > 5) best.pop();
         }
@@ -365,29 +440,34 @@
             <span class="win" title="Estimated chance the team wins the run">win chance <b>${Math.round(sq.win * 100)}%</b><span class="bar"><i style="width:${sq.win * 100}%"></i></span></span>
             <span class="ev" title="Win chance × marks the squad can still get (weighted by goal)">value ${sq.value.toFixed(1)}</span>
           </div>
+          <div class="why">
+            <span title="0.6 × best Damage + 0.4 × average Damage">Kill speed <b>${sq.why.kill.toFixed(1)}</b></span>
+            <span title="0.5 × best Survival + 0.5 × average Survival">Staying alive <b>${sq.why.alive.toFixed(1)}</b></span>
+            <span title="Sum of Team help, each character once, max 6">Team help <b>+${sq.why.help}</b></span>
+            <span title="Sum of Team cost">Team cost <b>−${sq.why.cost}</b></span>
+            <span title="How far the average Skill is above 2.5">Skill load <b>−${sq.why.skill.toFixed(1)}</b></span>
+          </div>
           <div class="members">${sq.members.map((m) => {
             const r = COOP[m.c.id];
-            return `<button class="member" data-char="${m.c.id}" style="--pc:${m.p.color}" title="${esc(r.note)}">
+            return `<button class="member" data-char="${m.c.id}" style="--pc:${m.p.color}" title="${esc(r.good.concat(r.bad).join(' · '))}">
               ${portraitSvg(m.c.portrait, m.c.tainted)}
               <span class="m-player">${esc(pname(m.p))}${m.role === 'carry' ? ' · carry' : m.role === 'pick' ? ' · hunting' : ''}</span>
               <span class="m-char">${esc(m.c.name)}</span>
               <span class="m-gain">${m.gain ? `+${m.gain} mark${m.gain > 1 ? 's' : ''} possible` : 'no marks left'}</span>
-              <span class="m-tags">${r.support >= 3 ? '<em class="t-sup">team support</em>' : ''}${r.power >= 4 ? '<em class="t-pow">carry</em>' : ''}${r.power <= 1 ? '<em class="t-hard">fragile</em>' : ''}${r.friction >= 2 ? '<em class="t-fri">gets in the way</em>' : ''}</span>
+              <span class="m-tags">${r.help >= 3 ? '<em class="t-sup">helps team</em>' : ''}${r.dmg >= 4 ? '<em class="t-pow">damage</em>' : ''}${r.surv >= 4 ? '<em class="t-pow">tanky</em>' : ''}${r.surv <= 0 ? '<em class="t-hard">one-hit</em>' : ''}${r.cost >= 2 ? '<em class="t-fri">takes loot</em>' : ''}</span>
             </button>`;
           }).join('')}</div>
         </article>`).join('') : '<p class="empty-hint light">No squad possible: a picked character is locked for that player.</p>';
     }
 
-    const tiers = [...CHARACTERS].sort((a, b) => {
-      const ra = COOP[a.id], rb = COOP[b.id];
-      return (rb.power + rb.support * 1.2 - rb.friction) - (ra.power + ra.support * 1.2 - ra.friction);
-    });
-    $('#tier-list').innerHTML = tiers.map((c) => {
+    $('#stat-help').innerHTML = Object.values(STAT_INFO).map((x) => `<li><b>${esc(x.label)}</b>: ${esc(x.q)}</li>`).join('');
+    const guide = [...CHARACTERS].sort((a, b) => soloValue(b) + 0.3 * COOP[b.id].help - soloValue(a) - 0.3 * COOP[a.id].help);
+    $('#tier-list').innerHTML = guide.map((c) => {
       const r = COOP[c.id];
       return `<div class="tier" data-char="${c.id}">${portraitSvg(c.portrait, c.tainted)}
-        <div class="tier-body"><b>${esc(c.name)}</b>
-          <div class="ratings">${ratingRow('Power', r.power, 5)}${ratingRow('Support', r.support, 5)}${ratingRow('Friction', r.friction, 3, true)}</div>
-          <p>${esc(r.note)}</p></div></div>`;
+        <div class="tier-body"><b>${esc(c.name)}</b>${statBars(r)}
+          <ul class="pros">${r.good.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+          <ul class="cons">${r.bad.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div></div>`;
     }).join('');
   }
 
@@ -483,6 +563,17 @@
   $('#sort-coop').addEventListener('change', (e) => { state.coopSort = e.target.checked; save(); select(state.selected); });
   $('#hard-mode').addEventListener('change', (e) => { state.hard = e.target.checked; save(); renderStage(); });
 
+  $('#note').addEventListener('click', (e) => {
+    const slot = e.target.closest('[data-mark]');
+    if (slot) openUnlock(slot.dataset.mark);
+  });
+  $('#unlock').addEventListener('click', (e) => {
+    // Close on the ✕ or a click on the backdrop (outside the dialog box).
+    const r = e.currentTarget.getBoundingClientRect();
+    const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    if (outside || e.target.closest('.u-close')) e.currentTarget.close();
+  });
+
   $('#chal-filter').addEventListener('click', (e) => {
     const t = e.target.closest('.tab');
     if (!t) return;
@@ -508,6 +599,8 @@
 
   // ---------- start ----------
   load();
+  readUrl();
+  writeUrl();
   renderPlayers();
   showView(state.view, false);
   state.players.filter((p) => !p.unlocked).forEach(loadPlayer);

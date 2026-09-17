@@ -70,14 +70,34 @@
   <div class="view" id="view-squad" hidden>
     <section class="sheet">
       <div class="sheet-head"><h2>Squad builder</h2></div>
-      <p class="sheet-sub">Pick what each player wants. The builder weighs marks still to get against the chance the team actually wins the run, using the co-op ratings below.</p>
+      <p class="sheet-sub">Pick what each player wants. Every squad gets a win chance from its characters' stats, and its value is win chance × the marks the players can still get.</p>
       <div id="squad-controls" class="squad-controls"></div>
       <div id="squad-results" class="squad-results"></div>
-      <h3 class="sheet-h3">Co-op ratings</h3>
-      <p class="sheet-sub">Power = how easily they win. Support = how much they help teammates. Friction = how much they get in the way. Edit in <code>js/coop.js</code>.</p>
+      <details class="how">
+        <summary>How the win chance works</summary>
+        <p>Each character has five 0–5 stats:</p>
+        <ul id="stat-help"></ul>
+        <p>For a squad:</p>
+        <ul>
+          <li><b>Kill speed</b> = 0.6 × best Damage + 0.4 × average Damage</li>
+          <li><b>Staying alive</b> = 0.5 × best Survival + 0.5 × average Survival. Dead players keep fighting as ghosts, so one survivor matters most.</li>
+          <li><b>Team help</b> = total Team help, each character counted once, max 6. Only counts with 2+ players.</li>
+          <li><b>Team cost</b> = total Team cost. Only counts with 2+ players.</li>
+          <li><b>Skill load</b> = how far the average Skill is above 2.5</li>
+          <li>rating = 0.45 × Kill + 0.35 × Alive + 0.3 × Help − 0.2 × Cost − 0.25 × Skill load; win chance = 10% + 17% × rating (5–95%)</li>
+          <li><b>Goals</b>: Auto counts your marks ×1, Carry ×0.2 (so you get a strong or helpful character), hunting a picked character ×1.5. One run counts at most 5 marks per player.</li>
+        </ul>
+      </details>
+      <h3 class="sheet-h3">Character guide</h3>
+      <p class="sheet-sub">Best co-op picks first. Hover a stat for what it means; numbers live in <code>js/coop.js</code>.</p>
       <div id="tier-list" class="tier-list"></div>
     </section>
   </div>
+
+  <dialog id="unlock" class="unlock">
+    <button class="u-close" aria-label="Close" autofocus>✕</button>
+    <div id="unlock-body"></div>
+  </dialog>
 
   <footer class="foot">
     Data: public Steam achievements (profile and game details must be public). Not affiliated with Nicalis or Edmund McMillen.
@@ -85,6 +105,7 @@
 
   <script src="js/data.js"></script>
   <script src="js/challenges.js"></script>
+  <script src="js/unlocks.js"></script>
   <script src="js/coop.js"></script>
   <script src="js/art.js"></script>
   <script src="js/app.js"></script>
