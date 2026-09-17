@@ -18,6 +18,7 @@
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
       <button class="view-btn" data-view="spindown">Spindown</button>
+      <button class="help-btn" id="help-btn" aria-label="How to use this site" title="How to use this site">?</button>
     </nav>
     <div class="players" id="players"></div>
     <form class="add-player" id="add-form" autocomplete="off">
@@ -115,6 +116,30 @@
       <div id="spin-out" class="spin-out"></div>
     </section>
   </div>
+
+  <dialog id="intro" class="unlock intro" aria-labelledby="intro-title">
+    <button class="u-close" aria-label="Close">✕</button>
+    <h3 id="intro-title">How to use Co-op Marks</h3>
+    <p class="u-kind">Compare Binding of Isaac progress with your friends and pick what to play together.</p>
+    <ol class="steps">
+      <li>
+        <b>Add players.</b> Paste a Steam profile link or Steam ID in the box at the top and press <em>+ Add player</em> (up to 4).
+        The profile and its <em>game details</em> must be public on Steam. Click a player's color circle to change their color.
+      </li>
+      <li>
+        <b>Share.</b> The page address holds the player list, so just send the link to your friends.
+      </li>
+    </ol>
+    <div class="tour">
+      <button data-go="marks"><b>Marks</b><span>Pick a character. Each mark is colored by who has it, split when several players do. A dot under a mark = still missing. Click a mark to see what it unlocks.</span></button>
+      <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
+      <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
+      <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
+    </div>
+    <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.
+      Reopen this anytime with the <b>?</b> button.</p>
+    <button class="btn intro-ok" data-close>Got it</button>
+  </dialog>
 
   <dialog id="unlock" class="unlock">
     <button class="u-close" aria-label="Close" autofocus>✕</button>

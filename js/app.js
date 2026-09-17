@@ -708,11 +708,23 @@
     const slot = e.target.closest('[data-mark]');
     if (slot) openUnlock(slot.dataset.mark);
   });
-  $('#unlock').addEventListener('click', (e) => {
-    // Close on the ✕ or a click on the backdrop (outside the dialog box).
-    const r = e.currentTarget.getBoundingClientRect();
+  // Dialogs close on the ✕ / "Got it" button or a click on the backdrop (outside the dialog box).
+  $$('dialog').forEach((d) => d.addEventListener('click', (e) => {
+    const r = d.getBoundingClientRect();
     const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
-    if (outside || e.target.closest('.u-close')) e.currentTarget.close();
+    if (outside || e.target.closest('.u-close, [data-close]')) d.close();
+  }));
+
+  // ---------- how-to popup: shown on the first visit, reopened with "?" ----------
+  const INTRO_KEY = 'isaac-coop-marks.intro-seen';
+  $('#help-btn').addEventListener('click', () => $('#intro').showModal());
+  $('#intro').addEventListener('close', () => { try { localStorage.setItem(INTRO_KEY, '1'); } catch (e) { /* ignore */ } });
+  $('#intro').addEventListener('click', (e) => {
+    const go = e.target.closest('[data-go]');
+    if (!go) return;
+    $('#intro').close();
+    showView(go.dataset.go);
+    if (go.dataset.go === 'marks' && !state.players.length) $('#add-input').focus();
   });
 
   $('#chal-filter').addEventListener('click', (e) => {
@@ -745,4 +757,7 @@
   renderPlayers();
   showView(state.view, false);
   state.players.filter((p) => !p.unlocked).forEach(loadPlayer);
+  let introSeen = false;
+  try { introSeen = !!localStorage.getItem(INTRO_KEY); } catch (e) { /* storage blocked: show it */ }
+  if (!introSeen) $('#intro').showModal();
 })();

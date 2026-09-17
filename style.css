@@ -450,3 +450,19 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .skipped s { text-decoration-thickness: 1.5px; }
 .spin-note { font-size: 14px; color: var(--ink-soft); margin: 6px 0 0; }
 @media (max-width: 760px) { .spin-out { grid-template-columns: 1fr; } }
+
+/* ---------- how-to popup ---------- */
+.help-btn { width: 30px; height: 30px; margin-left: 6px; border-radius: 50%; border: 2.5px solid var(--paper); background: none; color: var(--paper); font-size: 20px; line-height: 1; cursor: pointer; align-self: center; }
+.help-btn:hover { border-color: #ff6b5b; color: #ff6b5b; }
+.unlock.intro { width: min(600px, calc(100vw - 32px)); }
+.intro h3 { padding-right: 24px; }
+.steps { margin: 10px 0 8px; padding-left: 22px; }
+.steps li { margin: 4px 0; line-height: 1.25; }
+.steps em, .intro-foot em { font-style: normal; color: var(--blood); }
+.tour { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin: 10px 0; }
+.tour button { display: grid; gap: 2px; text-align: left; padding: 8px 10px; background: rgba(255,255,255,.35); border: 2.5px solid var(--ink); border-radius: 10px 6px 12px 8px; cursor: pointer; }
+.tour button:hover { background: rgba(242, 201, 76, .25); transform: translateY(-1px); }
+.tour b { font-size: 22px; font-weight: 400; color: var(--blood); }
+.tour span { font-size: 15px; line-height: 1.2; color: var(--ink-soft); }
+.intro-foot { font-size: 15px; color: var(--ink-soft); }
+.intro-ok { display: block; margin: 10px 0 0 auto; font-size: 20px; }
