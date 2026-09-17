@@ -30,6 +30,7 @@
     chalFilter: 'all',
     squad: { goals: {}, dupes: false },
     spin: { source: 'union', all: false, steps: 10, item: null },
+    pool: { mode: 'union', q: '', minQ: 0, sort: 'id' },
   };
 
   // ---------- persistence ----------
@@ -37,7 +38,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         view: state.view, selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
-        chalFilter: state.chalFilter, squad: state.squad, spin: state.spin,
+        chalFilter: state.chalFilter, squad: state.squad, spin: state.spin, pool: state.pool,
         players: state.players.map((p) => ({
           input: p.input, path: p.path, sid: p.sid, color: p.color, name: p.name, avatar: p.avatar,
           unlocked: p.unlocked ? [...p.unlocked] : null, fetchedAt: p.fetchedAt,
@@ -88,6 +89,7 @@
         view: d.view || 'marks', selected: d.selected || 'isaac', filter: d.filter || 'all', coopSort: !!d.coopSort,
         hard: d.hard !== false, chalFilter: d.chalFilter || 'all', squad: { goals: {}, dupes: false, ...(d.squad || {}) },
         spin: { ...state.spin, ...(d.spin || {}) },
+        pool: { ...state.pool, ...(d.pool || {}) },
       });
       state.players = (d.players || []).map((p) => ({ ...p, unlocked: p.unlocked ? new Set(p.unlocked) : null, status: p.unlocked ? 'ok' : 'idle' }));
     } catch (e) { /* ignore corrupt or blocked storage */ }
@@ -685,12 +687,65 @@
     renderSpindown();
   }
 
+  // ---------- item pool (beta) ----------
+  // Which items the lobby has unlocked, estimated from Steam achievements like the Spindown calculator.
+  function poolOwners(it) {
+    return loaded().filter((p) => !it.ach || p.unlocked.has(it.ach));
+  }
+
+  function renderPool() {
+    const ps = loaded();
+    const modes = [['union', 'Unlocked by anyone (union)'], ['everyone', 'Unlocked by everyone'],
+      ...ps.map((p) => [p.path, `${pname(p)}'s save`]), ['locked', 'Locked for everyone']];
+    if (!modes.some(([v]) => v === state.pool.mode)) state.pool.mode = 'union';
+    $('#pool-mode').innerHTML = modes.map(([v, l]) => `<option value="${esc(v)}"${v === state.pool.mode ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    $('#pool-quality').value = String(state.pool.minQ);
+    $('#pool-sort').value = state.pool.sort;
+    if ($('#pool-search').value !== state.pool.q) $('#pool-search').value = state.pool.q;
+
+    const all = [...itemById.values()].filter((it) => !it.hidden);
+    const inMode = (it) => {
+      const owners = poolOwners(it);
+      switch (state.pool.mode) {
+        case 'union': return !it.ach || owners.length > 0;
+        case 'everyone': return !it.ach || (ps.length > 0 && owners.length === ps.length);
+        case 'locked': return !!it.ach && owners.length === 0;
+        default: return !it.ach || owners.some((p) => p.path === state.pool.mode);
+      }
+    };
+    const matching = all.filter(inMode);
+    const q = state.pool.q.trim().toLowerCase().replace(/^#/, '');
+    let shown = matching.filter((it) => it.quality >= state.pool.minQ
+      && (!q || it.name.toLowerCase().includes(q) || String(it.id) === q || (it.desc || '').toLowerCase().includes(q)));
+    const by = { id: (a, b) => a.id - b.id, name: (a, b) => a.name.localeCompare(b.name), quality: (a, b) => b.quality - a.quality || a.id - b.id };
+    shown.sort(by[state.pool.sort] || by.id);
+
+    const lockedCount = all.filter((it) => it.ach && poolOwners(it).length === 0).length;
+    const summary = state.pool.mode === 'locked'
+      ? `<b>${matching.length}</b> items nobody has unlocked yet`
+      : `<b>${matching.length}</b> of ${all.length} items available · ${lockedCount} still locked for everyone`;
+    const hint = !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked are shown. Add players at the top.</p>' : '';
+
+    $('#pool-summary').innerHTML = `${summary}${shown.length !== matching.length ? ` · showing ${shown.length}` : ''}`;
+    $('#pool-grid').innerHTML = hint + (shown.map((it) => {
+      const owners = poolOwners(it);
+      const dots = it.ach && ps.length > 1 ? `<span class="who">${ps.map((p) => `<i style="${owners.includes(p) ? `background:${p.color}` : ''}" title="${esc(pname(p))}: ${owners.includes(p) ? 'unlocked' : 'locked'}"></i>`).join('')}</span>` : '';
+      const tag = !it.ach ? '<span class="pool-tag">starts unlocked</span>' : '';
+      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}${it.ach ? '' : '\nAvailable from the start'}\nClick to open in the Spindown calculator">
+        <span class="pool-top"><span class="iid">#${it.id}</span>${qualityStars(it.quality)}</span>
+        <span class="pool-name">${esc(it.name)}</span>
+        <span class="pool-bottom">${tag}${dots}</span>
+      </button>`;
+    }).join('') || '<p class="empty-hint light">No items match.</p>');
+  }
+
   // ---------- views ----------
   function renderView() {
     if (state.view === 'marks') { renderCarousel(); renderStage(); }
     if (state.view === 'challenges') renderChallenges();
     if (state.view === 'squad') renderSquad();
     if (state.view === 'spindown') renderSpindown();
+    if (state.view === 'pool') renderPool();
   }
 
   function render() {
@@ -842,6 +897,20 @@
   $('#spin-out').addEventListener('click', (e) => {
     const b = e.target.closest('[data-item]');
     if (b) pickItem(b.dataset.item);
+  });
+  $('#pool-mode').addEventListener('change', (e) => { state.pool.mode = e.target.value; save(); renderPool(); });
+  $('#pool-quality').addEventListener('change', (e) => { state.pool.minQ = +e.target.value; save(); renderPool(); });
+  $('#pool-sort').addEventListener('change', (e) => { state.pool.sort = e.target.value; save(); renderPool(); });
+  let poolTimer;
+  $('#pool-search').addEventListener('input', (e) => {
+    clearTimeout(poolTimer);
+    poolTimer = setTimeout(() => { state.pool.q = e.target.value; save(); renderPool(); }, 150);
+  });
+  $('#pool-grid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-item]');
+    if (!b) return;
+    state.spin.item = +b.dataset.item;
+    showView('spindown');
   });
   $('#spin-source').addEventListener('change', (e) => { state.spin.source = e.target.value; save(); renderSpindown(); });
   $('#spin-all').addEventListener('change', (e) => { state.spin.all = e.target.checked; save(); renderSpindown(); });

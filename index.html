@@ -18,6 +18,7 @@
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
       <button class="view-btn" data-view="spindown">Spindown</button>
+      <button class="view-btn" data-view="pool">Items <sup class="beta-sup">beta</sup></button>
       <button class="help-btn" id="help-btn" aria-label="How to use this site" title="How to use this site">?</button>
     </nav>
     <div class="players" id="players"></div>
@@ -127,6 +128,30 @@
     </section>
   </div>
 
+  <div class="view" id="view-pool" hidden>
+    <section class="sheet">
+      <div class="sheet-head"><h2>Item pool <span class="beta-tag">beta</span></h2></div>
+      <p class="spin-intro"><b>Which items can show up for your lobby?</b> Every item you have unlocked, combined across players (union) or per save. Click an item to open it in the Spindown calculator.</p>
+      <p class="estimate"><b>Beta, this is an estimate and may not work right.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run follows one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to.</p>
+      <div class="spin-controls">
+        <label class="spin-field">Show
+          <select id="pool-mode"></select>
+        </label>
+        <label class="spin-field">Quality
+          <select id="pool-quality"><option value="0">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4 only</option></select>
+        </label>
+        <label class="spin-field">Sort
+          <select id="pool-sort"><option value="id">ID</option><option value="name">Name</option><option value="quality">Quality</option></select>
+        </label>
+      </div>
+      <div class="spin-search">
+        <input id="pool-search" type="search" placeholder="Filter by name, ID or effect" aria-label="Filter items" autocomplete="off">
+      </div>
+      <p class="pool-summary" id="pool-summary"></p>
+      <div class="pool-grid" id="pool-grid"></div>
+    </section>
+  </div>
+
   <dialog id="intro" class="unlock intro" aria-labelledby="intro-title">
     <button class="u-close" aria-label="Close">✕</button>
     <h3 id="intro-title">How to use Co-op Marks</h3>
@@ -145,6 +170,7 @@
       <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
       <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
       <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
+      <button data-go="pool"><b>Items (beta)</b><span>Every item your lobby has unlocked, combined or per player. An estimate that may not always be right.</span></button>
     </div>
     <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.
       Reopen this anytime with the <b>?</b> button.</p>
