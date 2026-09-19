@@ -335,14 +335,22 @@
       const have = unknown ? [] : per.filter((x) => x.s === 'done');
       const missing = unknown ? [] : per.filter((x) => x.s === 'none');
       const miss = missing.map((x) => `<span class="dot-missing" style="--pc:${x.p.color}" title="${esc(pname(x.p))} is missing this"></span>`).join('');
+      // The Greed slot carries its own difficulty: Greedier is the hard tier of Greed mode, so
+      // it is drawn as a hard mark once everyone holding it got there through Greedier.
+      const hardId = m.hardKey && ch.ach[m.hardKey];
+      const onHard = m.hardKey
+        ? have.length > 0 && have.every((x) => hardId && x.p.unlocked.has(hardId))
+        : state.hard;
       const tip = unknown ? `${m.label} — Steam doesn't track this mark here`
         : !ps.length ? `${m.label} — click to see what it unlocks`
         : have.length === ps.length ? `${m.label} — everyone has it ✓`
         : have.length ? `${m.label} — ${have.length}/${ps.length} have it · missing: ${missing.map((x) => pname(x.p)).join(', ')}`
         : `${m.label} — nobody has it yet`;
+      const greedTier = m.hardKey && have.length
+        ? ` · ${onHard ? 'beaten on Greedier' : 'Greed only - nobody has Greedier yet'}` : '';
       const sel = state.selectedMark === m.key ? ' sel' : '';
-      return `<button class="slot${unknown ? ' unknown' : ''}${sel}" data-mark="${m.key}" data-tip="${esc(tip)}" aria-label="${esc(tip)}. Click to see what it unlocks.">
-        ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', state.hard)}${unknown ? '<span class="q">?</span>' : ''}
+      return `<button class="slot${unknown ? ' unknown' : ''}${sel}" data-mark="${m.key}" data-tip="${esc(tip + greedTier)}" aria-label="${esc(tip + greedTier)}. Click to see what it unlocks.">
+        ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', onHard)}${unknown ? '<span class="q">?</span>' : ''}
         <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></button>`;
     }).join('');
 
@@ -468,7 +476,7 @@
     { id: 'darkroom', name: 'Womb → Sheol → Dark Room', core: ['heart', 'satan', 'lamb'], bonus: ['bossrush', 'hush', 'megasatan', 'delirium'] },
     { id: 'mother', name: 'Alt path → Corpse → Mother', core: ['mother'], bonus: ['bossrush'] },
     { id: 'beast', name: 'Ascent → Home → The Beast', core: ['beast'], bonus: ['bossrush'] },
-    { id: 'greed', name: 'Greedier mode', core: ['greedier', 'greed'], bonus: [] },
+    { id: 'greed', name: 'Greedier mode', core: ['greed'], bonus: [] },
   ];
   const BONUS_WEIGHT = 0.6; // bonus marks are less certain than the route's own bosses
   const BONUS_TIPS = {

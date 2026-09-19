@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #16100d;
   --bg2: #2a1c16;
   --paper: #e8dbc1;
@@ -238,7 +238,7 @@ input, select, textarea {
 /* 13 marks in rows of 4 / 5 / 4 */
 .note-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px 4px; }
 .note-grid .slot { grid-column: span 2; }
-.note-grid .slot:nth-child(1), .note-grid .slot:nth-child(10) { grid-column: 2 / span 2; }
+.note-grid .slot:nth-child(4n + 1) { grid-column: 2 / span 2; }
 .slot {
   display: flex; flex-direction: column; align-items: center;
   padding: 4px 2px;
@@ -361,8 +361,7 @@ input, select, textarea {
 
 @media (max-width: 760px) {
   .note-grid { grid-template-columns: repeat(3, 1fr); }
-  .note-grid .slot, .note-grid .slot:nth-child(1), .note-grid .slot:nth-child(10) { grid-column: auto; }
-  .note-grid .slot:nth-child(13) { grid-column: 2; }
+  .note-grid .slot, .note-grid .slot:nth-child(4n + 1) { grid-column: auto; }
       .view-btn { font-size: 20px; padding: 2px 6px; }
   .stage { grid-template-columns: 1fr; }
   .char-card { display: grid; grid-template-columns: 110px 1fr; gap: 0 12px; text-align: left; align-items: center; }
@@ -415,7 +414,7 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .how li { margin: 2px 0; }
 .pros, .cons { margin: 2px 0 0; padding-left: 16px; font-size: 14px; line-height: 1.2; }
 .pros li::marker { content: "+ "; color: #2f8f4e; }
-.cons li::marker { content: "− "; color: var(--blood); }
+.cons li::marker { content: "â’ "; color: var(--blood); }
 
 /* ---------- spindown ---------- */
 .estimate { margin: 8px 0 14px; padding: 8px 12px; border: 2.5px dashed var(--blood); border-radius: 8px; background: rgba(156, 28, 23, .07); line-height: 1.25; }
@@ -741,3 +740,31 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .bonus-tips { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.3; }
 .squad .squad-win { margin-top: 10px; }
 .squad .win-percent { font-size: 30px; }
+
+/* ---- game sprites: completion marks + character portraits ---- */
+
+/* Marks are SVG rectangles rebuilt from the game's pixels, so they stay sharp at any size.
+   The sprite itself (outline and shading) is .mk-ink; the player colours fill the glyph's
+   solid interior, clipped to it. */
+.mark-svg { display: block; overflow: visible; }
+.mark-svg:not(.done) .mk-ink { opacity: .3; }
+.mark-svg.unknown .mk-ink { opacity: .18; }
+.mark-svg .mk-empty { color: rgba(60, 40, 25, .12); }
+.mark-svg .mk-unknown { color: rgba(60, 40, 25, .06); }
+
+/* Portrait sheet: 17 columns x 2 rows of 48px tiles, carried inline by js/portraits-art.js.
+   --pc / --pr pick the tile; the browser upscales it without smoothing. */
+.portrait {
+  display: block;
+  aspect-ratio: 1;
+  background-image: var(--portrait-sheet);
+  background-repeat: no-repeat;
+  background-size: calc(var(--portrait-cols) * 100%) calc(var(--portrait-rows) * 100%);
+  background-position: var(--px) var(--py);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.foot-credit { display: block; margin-top: 6px; font-size: 12px; line-height: 1.35; opacity: .75; }
+
+
