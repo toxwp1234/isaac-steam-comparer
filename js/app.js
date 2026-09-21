@@ -14,6 +14,8 @@
   ];
 
   const $ = (s) => document.querySelector(s);
+  // Inline SVG icons from the sprite at the top of index.html (same stroke style everywhere)
+  const ico = (n) => `<svg class="ico" aria-hidden="true"><use href="#i-${n}"/></svg>`;
   const $$ = (s) => document.querySelectorAll(s);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const pname = (p) => p.name || p.input;
@@ -184,7 +186,7 @@
         if (/^\d{17}$/.test(sid || '')) p.sid = sid;
       } catch (e) { /* name/avatar are optional */ }
       rememberPlayer(p);
-      if (fresh.length) showToast(`🎉 ${pname(p)} unlocked something new: ${newUnlockText(fresh)}`, 'ok', 8000);
+      if (fresh.length) showToast(`${pname(p)} unlocked something new: ${newUnlockText(fresh)}`, 'ok', 8000);
       else if (!quiet) showToast(`✓ ${pname(p)} loaded: ${overallProgress(p)}% of all marks`, 'ok');
     } catch (e) {
       p.status = 'error';
@@ -299,29 +301,29 @@
   function renderPlayers() {
     $('#players').innerHTML = state.players.map((p, i) => {
       const status = p.status === 'loading' ? '<span class="status">loading from Steam…</span>'
-        : p.status === 'error' ? `<button class="status err" data-act="error" title="What went wrong and how to fix it">⚠ ${esc(p.error ? p.error.title : 'Failed')} · <u>help</u></button>`
+        : p.status === 'error' ? `<button class="status err" data-act="error" title="What went wrong and how to fix it">${ico('warn')}<span>${esc(p.error ? p.error.title : 'Failed')} · <u>help</u></span></button>`
         : p.unlocked ? '' : '<span class="status">not loaded</span>';
       const pct = p.unlocked ? overallProgress(p) : 0;
       const progress = p.unlocked && p.status !== 'loading'
         ? `<span class="player-progress" title="${pct}% of all completion marks · ${p.unlocked.size} achievements"><span class="progress-bar"><span class="progress-fill" style="--progress:${pct}%;--pc:${p.color}"></span></span>${pct}% marks</span>` : '';
       const age = p.unlocked && p.status !== 'loading'
-        ? `<span class="age age-${ageClass(p.fetchedAt)}" title="Steam data fetched ${p.fetchedAt ? new Date(p.fetchedAt).toLocaleString() : 'at an unknown time'}. Press ↻ to refresh.">updated ${ago(p.fetchedAt)}</span>` : '';
+        ? `<span class="age age-${ageClass(p.fetchedAt)}" title="Steam data fetched ${p.fetchedAt ? new Date(p.fetchedAt).toLocaleString() : 'at an unknown time'}. Press the refresh icon to reload.">updated ${ago(p.fetchedAt)}</span>` : '';
       return `<div class="player${p.status === 'loading' ? ' loading' : ''}${p.status === 'error' ? ' err' : ''}" data-i="${i}">
         <label class="swatch" style="background:${p.color}" title="Click to change ${esc(pname(p))}'s color"><input type="color" value="${p.color}" data-act="color" aria-label="Change ${esc(pname(p))}'s color"></label>
         ${p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}
         <div class="who"><span class="name">${esc(pname(p))}</span>${status}${progress}${age}</div>
-        <button class="mini" data-act="reload" title="Refresh from Steam" aria-label="Refresh ${esc(pname(p))}">↻</button>
-        <button class="mini" data-act="remove" title="Remove from lobby" aria-label="Remove ${esc(pname(p))}">✕</button>
+        <button class="mini" data-act="reload" title="Refresh from Steam" aria-label="Refresh ${esc(pname(p))}">${ico('refresh')}</button>
+        <button class="mini" data-act="remove" title="Remove from lobby" aria-label="Remove ${esc(pname(p))}">${ico('close')}</button>
       </div>`;
     }).join('');
     const full = state.players.length >= MAX_PLAYERS;
     $('#add-input').disabled = full;
     $('#add-form button').disabled = full;
-    $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'steamcommunity.com/id/NAME or 76561198…';
+    $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'Steam profile link or ID';
     const busy = state.players.some((p) => p.status === 'loading');
     $('#refresh-all').hidden = !state.players.length;
     $('#refresh-all').disabled = busy;
-    $('#refresh-all').textContent = busy ? '↻ Refreshing…' : '↻ Refresh all';
+    $('#refresh-all').innerHTML = `${ico('refresh')}<span>${busy ? 'Refreshing…' : 'Refresh all'}</span>`;
     const stale = state.players.filter((p) => p.unlocked && p.status !== 'loading' && ageClass(p.fetchedAt) === 'stale');
     $('#stale-banner').hidden = !stale.length;
     if (stale.length) {
@@ -343,7 +345,7 @@
       <p class="u-note">${p.unlocked ? `Showing the data from ${ago(p.fetchedAt)} until it loads.` : 'Nothing is shown for this player until it loads.'}</p>
       <div class="u-actions">
         <a class="u-wiki" href="https://steamcommunity.com/${esc(p.path)}" target="_blank" rel="noopener">Open the Steam profile ↗</a>
-        <button class="btn" data-retry="${i}">↻ Try again</button>
+        <button class="btn" data-retry="${i}">${ico('refresh')}<span>Try again</span></button>
       </div>`;
     $('#unlock').showModal();
   }
@@ -376,8 +378,8 @@
       return `
       <span class="recent-item${old ? ' old' : ''}">
         <button class="recent-add" data-recent="${i}"${full ? ' disabled' : ''} title="${esc(tip)}">
-          ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(r.name)}</span><small class="recent-age">🕑 ${esc(ago(r.fetchedAt))}</small>
-        </button><button class="recent-forget" data-forget="${i}" aria-label="Forget ${esc(r.name)}" title="Forget this player (removes their saved data from this browser)">✕</button>
+          ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(r.name)}</span><small class="recent-age">${esc(ago(r.fetchedAt))}</small>
+        </button><button class="recent-forget" data-forget="${i}" aria-label="Forget ${esc(r.name)}" title="Forget this player (removes their saved data from this browser)">${ico('close')}</button>
       </span>`;
     }).join('')}` : '';
   }
@@ -411,7 +413,7 @@
     const tally = ps.map((p) => {
       const s = score(ch, p);
       const full = s.done === s.total;
-      return `<li class="${full ? 'complete' : ''}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>${hasChar(p, ch) ? '' : '<span class="lock" title="Character not unlocked">🔒</span>'}${full ? '<span class="stamp" title="All marks done">★ done</span>' : ''}<span class="sc">${s.done}/${s.total}</span></li>`;
+      return `<li class="${full ? 'complete' : ''}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>${hasChar(p, ch) ? '' : `<span class="lock" title="Character not unlocked">${ico('lock')}</span>`}${full ? '<span class="stamp" title="All marks done">★ done</span>' : ''}<span class="sc">${s.done}/${s.total}</span></li>`;
     }).join('');
     const r = COOP[ch.id];
     $('#char-card').className = `char-card${ch.tainted ? ' tainted' : ''}`;
@@ -486,7 +488,7 @@
       const ps = loaded();
       const who = ps.map((p) => {
         const s = markState(ch, m, p);
-        return `<span class="chip ${s === 'done' ? 'done' : 'open'}" style="--pc:${p.color}">${s === 'done' ? '✓' : ''}<em>${esc(pname(p))}</em></span>`;
+        return `<span class="chip ${s === 'done' ? 'done' : 'open'}" style="--pc:${p.color}">${s === 'done' ? ico('check') : ''}<em>${esc(pname(p))}</em></span>`;
       }).join('');
       const shared = ch.tainted && TAINTED_SHARED[m.key]
         ? `<p class="u-note">For tainted characters this one unlock needs all of: ${TAINTED_SHARED[m.key]}.</p>` : '';
@@ -539,26 +541,26 @@
       const locked = st.filter((x) => x.s === 'lock');
       const need = st.filter((x) => x.s !== 'done');
       const kind = !need.length ? 'done' : locked.length ? 'locked' : 'open';
-      const badge = kind === 'done' ? '✓ Everyone beat it'
-        : kind === 'locked' ? `🔒 Locked for ${locked.map((x) => pname(x.p)).join(', ')}`
-        : `◯ Ready for co-op · ${need.length} still need it`;
+      const badge = kind === 'done' ? `${ico('check')}Everyone beat it`
+        : kind === 'locked' ? `${ico('lock')}Locked for ${esc(locked.map((x) => pname(x.p)).join(', '))}`
+        : `${ico('target')}Ready for co-op · ${need.length} still need it`;
       const chips = st.map(({ p, s }) => {
         const label = s === 'done' ? 'beaten' : s === 'open' ? 'unlocked, not beaten' : 'locked';
-        return `<span class="chip ${s}" style="--pc:${p.color}" title="${esc(pname(p))}: ${label}">${s === 'done' ? '✓' : s === 'lock' ? '🔒' : ''}<em>${esc(pname(p))}</em></span>`;
+        return `<span class="chip ${s}" style="--pc:${p.color}" title="${esc(pname(p))}: ${label}">${s === 'done' ? ico('check') : s === 'lock' ? ico('lock') : ''}<em>${esc(pname(p))}</em></span>`;
       }).join('');
-      const req = c.req.length ? `🔑 Unlock: ${esc(c.reqText)}` : '🔑 Available from the start';
+      const req = c.req.length ? `Unlock: ${esc(c.reqText)}` : 'Available from the start';
       return `<article class="chal-card ${kind}">
         <div class="chal-header">
           <div class="chal-portrait">${portraitSvg(ch.portrait, ch.tainted)}</div>
           <div class="chal-info">
             <h3 class="chal-name"><span class="chal-n">#${c.n}</span> ${esc(c.name)}</h3>
-            <p class="chal-goal">🎯 Defeat ${esc(c.goal)} as ${esc(c.char)}</p>
-            <p class="chal-reward">🎁 ${esc(c.reward)}</p>
+            <p class="chal-goal chal-line">${ico('target')}<span>Defeat ${esc(c.goal)} as ${esc(c.char)}</span></p>
+            <p class="chal-reward chal-line">${ico('gift')}<span>${esc(c.reward)}</span></p>
           </div>
         </div>
-        <span class="badge badge-${kind}">${esc(badge)}</span>
+        <span class="badge badge-${kind}">${badge}</span>
         <div class="chips">${chips}</div>
-        <p class="chal-req">${req}</p>
+        <p class="chal-req chal-line">${ico('key')}<span>${req}</span></p>
       </article>`;
     }).join('') || '<p class="empty-hint light">Nothing matches this filter.</p>';
   }
@@ -682,16 +684,16 @@
         const hunting = goal !== 'auto' && goal !== 'carry';
         const opt = (c) => {
           const sc = score(c, p), lock = !hasChar(p, c);
-          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${lock ? '🔒 ' : ''}${esc(c.name)} — ${lock ? 'not unlocked' : `${sc.missing} missing`}</option>`;
+          return `<option value="${c.id}"${goal === c.id ? ' selected' : ''}${lock ? ' disabled' : ''}>${esc(c.name)} — ${lock ? 'not unlocked' : `${sc.missing} missing`}</option>`;
         };
         const btn = (g, icon, label, tip, on) => `<button class="goal-button${on ? ' selected' : ''}" data-path="${esc(p.path)}" data-goal="${g}" aria-pressed="${on}" title="${tip}"><span class="goal-icon">${icon}</span><span class="goal-button-label">${label}</span></button>`;
         const unlockedCount = CHARACTERS.filter((c) => hasChar(p, c)).length;
         return `<div class="goal" style="--pc:${p.color}">
           <span class="goal-who"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span><span class="goal-unlocked" title="Only unlocked characters are suggested">${unlockedCount}/${CHARACTERS.length} characters</span></span>
           <div class="goal-buttons" role="group" aria-label="What ${esc(pname(p))} wants">
-            ${btn('auto', '✨', 'Auto', 'Best marks for me', goal === 'auto')}
-            ${btn('carry', '🛡️', 'Carry', 'Play something strong to help the team', goal === 'carry')}
-            ${btn('hunt', '🎯', 'Hunt', 'Pick a character you want marks on', hunting)}
+            ${btn('auto', ico('sparkle'), 'Auto', 'Best marks for me', goal === 'auto')}
+            ${btn('carry', ico('shield'), 'Carry', 'Play something strong to help the team', goal === 'carry')}
+            ${btn('hunt', ico('target'), 'Hunt', 'Pick a character you want marks on', hunting)}
           </div>
           ${hunting ? `<select class="hunt-select" data-path="${esc(p.path)}" aria-label="Character to hunt">
             <optgroup label="Normal">${CHARACTERS.filter((c) => !c.tainted).map(opt).join('')}</optgroup>
@@ -709,9 +711,9 @@
         return `
         <article class="squad${i === 0 ? ' best' : ''}">
           <div class="squad-goal">
-            <span class="rank">${i === 0 ? '🏆' : `#${i + 1}`}</span>
+            <span class="rank">${i === 0 ? ico('trophy') : `#${i + 1}`}</span>
             <div class="goal-text">
-              <span class="goal-kicker">🎯 Goal for this run</span>
+              <span class="goal-kicker">${ico('target')}Goal for this run</span>
               <span class="goal-route">${esc(sq.route.name)}</span>
               <span class="goal-sum">${coreTotal} mark${coreTotal === 1 ? '' : 's'} from the route${total > coreTotal ? ` + up to ${total - coreTotal} bonus` : ''}${i === 0 ? ' · <b>best pick</b>' : ''}</span>
             </div>
@@ -1002,8 +1004,8 @@
     e.preventDefault();
     const input = $('#add-input').value;
     const path = profilePath(input);
-    if (!input.trim()) { showToast('📝 Paste a Steam profile link or Steam ID first.', 'err'); $('#add-input').focus(); return; }
-    if (!path) { showToast('📝 That doesn’t look like a Steam profile. Use steamcommunity.com/id/NAME or the 17-digit Steam ID (7656…).', 'err', 6000); $('#add-input').classList.add('shake'); setTimeout(() => $('#add-input').classList.remove('shake'), 500); return; }
+    if (!input.trim()) { showToast('Paste a Steam profile link or Steam ID first.', 'err'); $('#add-input').focus(); return; }
+    if (!path) { showToast('That doesn’t look like a Steam profile. Use steamcommunity.com/id/NAME or the 17-digit Steam ID (7656…).', 'err', 6000); $('#add-input').classList.add('shake'); setTimeout(() => $('#add-input').classList.remove('shake'), 500); return; }
     if (state.players.some((p) => p.path.toLowerCase() === path.toLowerCase())) { $('#add-input').value = ''; showToast('That player is already added.'); return; }
     const used = state.players.map((p) => p.color);
     const p = { input: input.trim(), path, color: COLORS.find((c) => !used.includes(c)) || COLORS[0], unlocked: null, status: 'idle' };
@@ -1186,7 +1188,7 @@
     writeUrl();
     try {
       await navigator.clipboard.writeText(location.href);
-      showToast('🔗 Link copied: it opens this page with the same players.', 'ok');
+      showToast('Link copied: it opens this page with the same players.', 'ok');
     } catch (e) {
       prompt('Copy this link:', location.href);
     }

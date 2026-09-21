@@ -42,7 +42,7 @@ button, .btn,
 .lock, .chip,
 .chal-name, .chal-goal,
 .tier b,
-.view-btn, .help-btn,
+.view-btn,
 .slot .lbl, .tally, .stat b, .m-char, .m-player,
 .win-percent, .rank, .badge, .stamp, .u-type, .u-quote,
 .spin-current .nm, .big-id, .tour b, .role-guide b, .how summary, .why-wrap summary {
@@ -108,28 +108,65 @@ input, select, textarea {
 .player .name { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .player .status { font-size: 14px; color: var(--ink-soft); }
 .player .status.err { color: var(--blood); }
-.player .mini { background: none; border: 0; cursor: pointer; font-size: 20px; padding: 0 2px; color: var(--ink-soft); }
-.player .mini:hover { color: var(--ink); }
+.player .mini { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; background: none; border: 0; border-radius: 50%; cursor: pointer; color: var(--ink-soft); transition: color .15s, background .15s; }
+.player .mini .ico { width: 16px; height: 16px; }
+.player .mini:hover { color: var(--ink); background: rgba(0,0,0,.1); }
+.player .mini[data-act="remove"]:hover { color: var(--blood); background: rgba(156, 28, 23, .12); }
 
-.add-player { display: flex; gap: 8px; flex-wrap: wrap; }
-.add-player input {
-  width: min(280px, 100%);
-  padding: 6px 10px;
+.add-player { display: flex; align-items: stretch; gap: 10px; max-width: 100%; }
+/* Steam link box: a paper note with a pressed-in look; the whole box lights up on focus */
+.add-field {
+  display: flex; align-items: center; gap: 8px;
+  flex: 1 1 auto; width: 310px; max-width: 100%; min-width: 0;
+  padding: 0 12px;
+  color: var(--ink-soft);
   background: var(--paper-noise), var(--note);
   border: 3px solid var(--ink);
-  border-radius: 8px 4px 10px 6px;
+  border-radius: 10px 6px 12px 8px;
+  box-shadow: inset 2px 3px 0 rgba(0,0,0,.14), 2px 2px 0 #000;
+  cursor: text;
+  transition: border-color .15s, box-shadow .15s, color .15s;
 }
+.add-field:hover { border-color: #4a3428; }
+.add-field:focus-within {
+  color: var(--blood);
+  border-color: #c9372c;
+  box-shadow: inset 2px 3px 0 rgba(0,0,0,.14), 0 0 0 3px rgba(242, 201, 76, .6), 2px 2px 0 #000;
+}
+.add-field .ico { width: 20px; height: 20px; }
+.add-field input {
+  flex: 1; min-width: 0; width: 100%;
+  padding: 8px 0;
+  color: var(--ink);
+  background: none; border: 0; outline: 0;
+}
+.add-field input::placeholder { font-family: var(--font-heading); font-size: 20px; color: var(--ink-soft); opacity: .8; }
+.add-field:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+
 .btn {
-  padding: 6px 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 6px 16px;
   background: #c9372c;
   color: #fff4e6;
   border: 3px solid var(--ink);
   border-radius: 10px 6px 12px 4px;
   box-shadow: 2px 2px 0 #000;
+  font-size: 19px; line-height: 1.1;
   cursor: pointer;
+  transition: background .15s, transform .08s, box-shadow .08s;
 }
 .btn:hover { background: #dd4436; }
+.btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 0 0 0 #000; }
 .btn:disabled { opacity: .5; cursor: default; }
+.btn .ico { width: 1em; height: 1em; }
+
+/* Icons: inline SVG from the sprite in index.html; they inherit the text colour */
+.ico { display: block; flex: none; width: 1em; height: 1em; overflow: visible; }
+
+/* Keyboard focus: one clear ring everywhere */
+:focus-visible { outline: 3px solid #f2c94c; outline-offset: 2px; }
+.add-field input:focus-visible { outline: 0; }
+::selection { background: rgba(201, 55, 44, .35); }
 
 /* ---------- character select ---------- */
 .select { padding: 0 clamp(16px, 4vw, 40px); }
@@ -396,7 +433,8 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .unlock::backdrop { background: rgba(10, 6, 4, .6); }
 .unlock h3 { margin: 0; font-size: 28px; font-weight: 400; line-height: 1.05; }
 .unlock p { margin: 8px 0; line-height: 1.25; }
-.u-close { position: absolute; top: 6px; right: 8px; background: none; border: 0; font-size: 22px; cursor: pointer; color: var(--ink-soft); }
+.u-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; background: none; border: 0; border-radius: 50%; font-size: 18px; cursor: pointer; color: var(--ink-soft); transition: color .15s, background .15s; }
+.u-close:hover { color: var(--blood); background: rgba(156, 28, 23, .1); }
 .u-head { display: flex; gap: 12px; align-items: center; padding-right: 20px; }
 .u-head img { border: 3px solid var(--ink); border-radius: 6px; flex: none; }
 .u-kind { font-size: 15px; color: var(--ink-soft); margin: 0 !important; }
@@ -421,7 +459,7 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .estimate b { color: var(--blood); font-weight: 400; }
 .spin-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-bottom: 12px; }
 .spin-field { display: flex; align-items: center; gap: 6px; }
-.spin-field select { padding: 4px 6px; background: var(--note); border: 2.5px solid var(--ink); border-radius: 8px; max-width: 240px; }
+.spin-field select { padding: 4px 6px; background: var(--note); border: 2.5px solid var(--ink); border-radius: 8px; max-width: min(300px, 100%); }
 .spin-controls .check input:checked + * { color: var(--blood); }
 .spin-search { position: relative; max-width: 460px; }
 .spin-search input { width: 100%; padding: 8px 12px; font-size: 20px; background: var(--paper-noise), var(--note); border: 3px solid var(--ink); border-radius: 10px 6px 12px 8px; }
@@ -453,8 +491,16 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 @media (max-width: 760px) { .spin-out { grid-template-columns: 1fr; } }
 
 /* ---------- how-to popup ---------- */
-.help-btn { width: 30px; height: 30px; margin-left: 6px; border-radius: 50%; border: 2.5px solid var(--paper); background: none; color: var(--paper); font-size: 20px; line-height: 1; cursor: pointer; align-self: center; }
-.help-btn:hover { border-color: #ff6b5b; color: #ff6b5b; }
+.icon-btn {
+  display: grid; place-items: center; flex: none;
+  width: 34px; height: 34px; padding: 0; margin-left: 6px; align-self: center;
+  border-radius: 50%; border: 2.5px solid var(--paper);
+  background: none; color: var(--paper); cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s, transform .12s;
+}
+.icon-btn .ico { width: 18px; height: 18px; }
+.icon-btn:hover { border-color: #ff6b5b; color: #ff6b5b; background: rgba(255, 107, 91, .1); transform: rotate(-6deg); }
+.icon-btn:active { transform: scale(.94); }
 .unlock.intro { width: min(600px, calc(100vw - 32px)); }
 .intro h3 { padding-right: 24px; }
 .steps { margin: 10px 0 8px; padding-left: 22px; }
@@ -518,7 +564,7 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .progress-fill { display: block; height: 100%; width: var(--progress, 0%); background: var(--pc, #2f8f4e); animation: grow .8s ease-out; }
 @keyframes grow { from { width: 0; } }
 
-.add-player input.shake { animation: shake .4s; border-color: var(--blood); }
+.add-field:has(input.shake) { animation: shake .4s; border-color: var(--blood); }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
 /* ---------- marks: tooltip, hover, selection, missing dots ---------- */
@@ -653,12 +699,12 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 @media (max-width: 760px) {
   .btn, .tab, .view-btn, .nav, .player .mini, .tour button, .spin-results li, .chain button, .u-close, .intro-ok { min-height: 44px; }
   .player .mini { min-width: 40px; }
-  .help-btn { width: 40px; height: 40px; }
+  .icon-btn { width: 44px; height: 44px; }
   .check { min-height: 44px; }
   .check input { width: 22px; height: 22px; }
   .spin-field select, .goal select { min-height: 44px; }
   .add-player { flex-direction: column; width: 100%; }
-  .add-player input, .add-player .btn { width: 100%; min-height: 44px; }
+  .add-field, .add-player .btn { width: 100%; min-height: 44px; flex: none; }
   .player .swatch { width: 40px; height: 40px; }
   .views { flex-wrap: wrap; }
   .player .status.err { max-width: 200px; }
@@ -686,12 +732,18 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .recent-add:disabled { opacity: .5; cursor: default; }
 .recent-add img { width: 22px; height: 22px; border-radius: 50%; }
 .recent-add span { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recent-forget { background: none; border: 0; color: var(--paper-dark); cursor: pointer; padding: 0 8px 0 2px; font-size: 13px; }
+.recent-forget { display: grid; place-items: center; align-self: stretch; background: none; border: 0; color: var(--paper-dark); cursor: pointer; padding: 0 9px 0 3px; font-size: 12px; }
 .recent-forget:hover { color: #ff6b5b; }
 @media (max-width: 760px) { .recent-add, .recent-forget { min-height: 40px; } }
 
 /* ---------- item pool (beta) ---------- */
-.beta-sup { font-size: 11px; font-family: var(--font-body); color: #f2c94c; vertical-align: super; }
+.beta-sup {
+  display: inline-block; margin-left: 3px; padding: 0 6px;
+  font-size: 13px; line-height: 1.35; color: var(--ink);
+  background: #f2c94c; border: 1.5px solid var(--ink); border-radius: 5px;
+  box-shadow: 1px 1px 0 #000;
+  vertical-align: 10px; transform: rotate(-4deg);
+}
 .beta-tag { font-size: 16px; padding: 0 8px; border-radius: 6px; background: #f2c94c; border: 2px solid var(--ink); vertical-align: middle; }
 .pool-summary { margin: 12px 0 8px; color: var(--ink-soft); }
 .pool-summary b { color: var(--ink); }
@@ -773,9 +825,11 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .age-old { color: #8a6412; }
 .age-stale { color: var(--blood); font-weight: 600; }
 .player .status.err { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-family: var(--font-body); font-size: 13px; }
+.player .status.err { display: inline-flex; align-items: flex-start; gap: 4px; }
+.player .status.err .ico { margin-top: 1px; }
 .player .status.err u { text-underline-offset: 2px; }
 .player .status.err:hover { color: #c9372c; }
-.btn.ghost { background: transparent; color: var(--paper); border-color: var(--paper-dark); box-shadow: none; font-size: 17px; }
+.btn.ghost { background: transparent; color: var(--paper); border-color: var(--paper-dark); box-shadow: none; font-size: 18px; }
 .btn.ghost:hover:not(:disabled) { background: rgba(232,219,193,.12); }
 .btn.ghost[hidden] { display: none; }
 .stale-banner {
@@ -788,6 +842,8 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 }
 .stale-banner[hidden] { display: none; }
 .stale-banner .btn { padding: 2px 12px; }
+.stale-text { display: inline-flex; align-items: flex-start; gap: 8px; }
+.stale-text .ico { margin-top: .2em; color: #8a6412; }
 .recent-label small { font-size: 12px; opacity: .8; font-family: var(--font-body); }
 .recent-age { font-size: 11px; opacity: .75; font-family: var(--font-body); white-space: nowrap; }
 .recent-item.old { border-style: dashed; }
@@ -826,8 +882,49 @@ kbd { font-family: var(--font-body); font-size: 12px; padding: 0 5px; border: 1.
   width: 46px; height: 46px; border-radius: 50%;
   background: var(--paper-noise), var(--paper); color: var(--ink);
   border: 3px solid var(--ink); box-shadow: 3px 3px 0 rgba(0,0,0,.5);
-  font-size: 22px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center; padding: 0; font-size: 22px; cursor: pointer;
 }
 .to-top[hidden] { display: none; }
 .to-top:hover { background: var(--paper-noise), #f1dea0; }
 @media (max-width: 760px) { .btn.ghost { width: 100%; min-height: 44px; } }
+
+/* ---------- icons inside chips, badges, cards ---------- */
+.chip .ico { width: 12px; height: 12px; }
+.chip.done .ico { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.5)); }
+.chip-demo .ico { width: 12px; height: 12px; }
+.tally .lock .ico { width: 14px; height: 14px; }
+.goal-icon { display: grid; place-items: center; }
+.goal-icon .ico { width: 22px; height: 22px; }
+.rl { display: inline-flex; align-items: center; gap: 5px; vertical-align: bottom; }
+.rl .ico { width: 1.05em; height: 1.05em; }
+.chal-line { display: flex; align-items: flex-start; gap: 6px; }
+.chal-line .ico { width: 15px; height: 15px; margin-top: .1em; color: var(--ink-soft); }
+.chal-goal .ico { color: var(--blood); }
+.badge { display: inline-flex; align-items: center; gap: 5px; }
+.badge .ico { width: 15px; height: 15px; }
+.squad-goal .rank .ico { width: 32px; height: 32px; color: #b8860b; }
+.goal-kicker { display: inline-flex; align-items: center; gap: 5px; }
+.goal-kicker .ico { width: 14px; height: 14px; color: var(--blood); }
+
+/* ---------- form controls: same paper look as the Steam link box ---------- */
+.spin-field select, .goal select, select.hunt-select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 32px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5l4.5 4.5 4.5-4.5' fill='none' stroke='%232a1d17' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 11px center / 12px 8px no-repeat,
+    var(--paper-noise), var(--note);
+  border-radius: 10px 6px 12px 8px;
+  box-shadow: inset 1px 2px 0 rgba(0,0,0,.12), 2px 2px 0 rgba(0,0,0,.45);
+  cursor: pointer;
+  transition: transform .12s, box-shadow .12s;
+}
+.spin-field select:hover, .goal select:hover, select.hunt-select:hover { transform: translateY(-1px); }
+.spin-field select { font-size: 17px; padding-top: 5px; padding-bottom: 5px; }
+.spin-search input {
+  box-shadow: inset 2px 3px 0 rgba(0,0,0,.14), 2px 2px 0 rgba(0,0,0,.45);
+  transition: border-color .15s, box-shadow .15s;
+}
+.spin-search input:hover { border-color: #4a3428; }
+.spin-search input:focus { outline: 0; border-color: #c9372c; box-shadow: inset 2px 3px 0 rgba(0,0,0,.14), 0 0 0 3px rgba(242, 201, 76, .6), 2px 2px 0 rgba(0,0,0,.45); }
+.spin-search input::placeholder { font-family: var(--font-heading); font-size: 22px; color: var(--ink-soft); opacity: .8; }
+.spin-search input::-webkit-search-cancel-button { cursor: pointer; }

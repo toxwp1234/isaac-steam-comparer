@@ -11,6 +11,25 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Icon set: one hand-drawn stroke style (round caps, 2.4 stroke) so every button looks the same -->
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M8.4 9.3C8.6 7.3 10.1 6 12.1 6c2.1 0 3.6 1.3 3.6 3.1 0 1.5-.9 2.3-2.2 3.1-.9.6-1.5 1.2-1.5 2.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="18.6" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5a4.6 4.6 0 0 0 6.9.5l3-3a4.6 4.6 0 0 0-6.5-6.5l-1.7 1.7"/><path d="M14 10.5a4.6 4.6 0 0 0-6.9-.5l-3 3a4.6 4.6 0 0 0 6.5 6.5l1.7-1.7"/></g></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12A8.5 8.5 0 1 1 18 6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/></g></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20c.6-3.7 3.4-5.6 7.2-5.6s6.6 1.9 7.2 5.6"/></g></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.2"/></g><circle cx="12" cy="17" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6M6 11.5l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l2.3 6.4L20.7 12l-6.4 2.6L12 21l-2.3-6.4L3.3 12l6.4-2.6z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.6c0 4.4-3.1 7.8-7.5 9.4-4.4-1.6-7.5-5-7.5-9.4V6z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.2"/></g><circle cx="12" cy="12" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5.2a4 4 0 0 1-8 0z"/><path d="M8 6H4.6c0 3.2 1.2 4.7 3.6 4.9M16 6h3.4c0 3.2-1.2 4.7-3.6 4.9M12 13.2V17M8.6 20.5h6.8M9.6 17h4.8"/></g></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15.5" r="3.8"/><path d="M10.7 12.8L20 3.6M16.4 7.2l3 3M13.6 10l2 2"/></g></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11v9h15v-9M3 7.5h18V11H3zM12 7.5V20"/><path d="M12 7.5C10.3 3.6 6.2 4.4 7 6.6c.5 1.1 2.8.9 5 .9s4.5.2 5-.9c.8-2.2-3.3-3-5 .9"/></g></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 11h13v9.5h-13zM8.2 11V8a3.8 3.8 0 0 1 7.6 0v3"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.6l4.6 4.6L19 7.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8"/></symbol>
+  </svg>
   <header class="top">
     <h1 class="title">Co-op <span>Marks</span></h1>
     <nav class="views" aria-label="Views">
@@ -18,21 +37,24 @@
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
       <button class="view-btn" data-view="spindown">Spindown</button>
-      <button class="view-btn" data-view="pool" title="Estimated from Steam achievements">Items <sup class="beta-sup">estimate</sup></button>
-      <button class="help-btn" id="help-btn" aria-label="How to use this site" title="How to use this site (?)">?</button>
-      <button class="help-btn share-btn" id="share-btn" aria-label="Copy a link to this page" title="Copy a link to this page with these players">🔗</button>
+      <button class="view-btn" data-view="pool" title="Estimated from Steam achievements">Items <span class="beta-sup">estimate</span></button>
+      <button class="icon-btn" id="help-btn" aria-label="How to use this site" title="How to use this site (?)"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+      <button class="icon-btn" id="share-btn" aria-label="Copy a link to this page" title="Copy a link to this page with these players"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg></button>
     </nav>
     <div class="players" id="players"></div>
-    <button class="btn ghost" id="refresh-all" hidden title="Reload every player from Steam">↻ Refresh all</button>
+    <button class="btn ghost" id="refresh-all" hidden title="Reload every player from Steam"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg><span>Refresh all</span></button>
     <form class="add-player" id="add-form" autocomplete="off">
-      <input id="add-input" type="text" placeholder="steamcommunity.com/id/NAME or 76561198…" title="Paste a Steam profile link (steamcommunity.com/id/… or /profiles/…) or a 17-digit Steam ID. The profile and its game details must be public." aria-label="Steam profile link or Steam ID">
-      <button type="submit" class="btn">+ Add player</button>
+      <label class="add-field">
+        <svg class="ico" aria-hidden="true"><use href="#i-user"/></svg>
+        <input id="add-input" type="text" placeholder="Steam profile link or ID" title="Paste a Steam profile link (steamcommunity.com/id/… or /profiles/…) or a 17-digit Steam ID. The profile and its game details must be public." aria-label="Steam profile link or Steam ID">
+      </label>
+      <button type="submit" class="btn"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg><span>Add player</span></button>
     </form>
     <div class="recent" id="recent" hidden></div>
   </header>
   <div class="stale-banner" id="stale-banner" role="status" hidden>
-    <span>⚠ <span id="stale-banner-text"></span></span>
-    <button class="btn" id="stale-refresh">↻ Refresh</button>
+    <span class="stale-text"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><span id="stale-banner-text"></span></span>
+    <button class="btn" id="stale-refresh"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg><span>Refresh</span></button>
   </div>
 
   <div class="view" id="view-marks">
@@ -70,7 +92,7 @@
         </div>
       </div>
       <p class="sheet-sub">
-        <span class="chip-demo lock">🔒</span> locked &nbsp; <span class="chip-demo open"></span> unlocked, not beaten &nbsp; <span class="chip-demo done">✓</span> beaten.
+        <span class="chip-demo lock"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg></span> locked &nbsp; <span class="chip-demo open"></span> unlocked, not beaten &nbsp; <span class="chip-demo done"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span> beaten.
         In co-op every player plays the challenge's character.
         <b>Ready for co-op</b> = everyone can play it and someone still needs to beat it.
       </p>
@@ -84,9 +106,9 @@
       <div class="role-guide">
         <p><b>What does each player want?</b></p>
         <ul>
-          <li><b>✨ Auto</b>: get me the most marks.</li>
-          <li><b>🛡️ Carry</b>: I'll play something strong so the others win.</li>
-          <li><b>🎯 Hunt</b>: I want marks on one specific character.</li>
+          <li><b class="rl"><svg class="ico" aria-hidden="true"><use href="#i-sparkle"/></svg>Auto</b>: get me the most marks.</li>
+          <li><b class="rl"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg>Carry</b>: I'll play something strong so the others win.</li>
+          <li><b class="rl"><svg class="ico" aria-hidden="true"><use href="#i-target"/></svg>Hunt</b>: I want marks on one specific character.</li>
         </ul>
         <p>Only characters a player has unlocked are suggested. Each squad gets a <b>goal</b>: the route (Chest, Dark Room, Mother, Beast or Greedier) where the players get the most marks they're still missing.</p>
       </div>
@@ -142,7 +164,7 @@
     <section class="sheet">
       <div class="sheet-head"><h2>Item pool <span class="beta-tag">estimate</span></h2></div>
       <p class="spin-intro"><b>Which items can show up for your lobby?</b> Every item you have unlocked, combined across players (union) or per save. Click an item to open it in the Spindown calculator.</p>
-      <p class="estimate"><b>⚠ This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to. Hover an item to see which achievement unlocks it.</p>
+      <p class="estimate"><b>This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to. Hover an item to see which achievement unlocks it.</p>
       <div class="spin-controls">
         <label class="spin-field">Show
           <select id="pool-mode"></select>
@@ -164,17 +186,17 @@
   </div>
 
   <dialog id="intro" class="unlock intro" aria-labelledby="intro-title">
-    <button class="u-close" aria-label="Close">✕</button>
+    <button class="u-close" aria-label="Close"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
     <h3 id="intro-title">How to use Co-op Marks</h3>
     <p class="u-kind">Compare Binding of Isaac progress with your friends and pick what to play together.</p>
     <ol class="steps">
       <li>
         <b>Add players.</b> Paste a Steam profile link or Steam ID in the box at the top and press <em>+ Add player</em> (up to 4).
         The profile and its <em>game details</em> must be public on Steam. Click a player's color circle to change their color.
-        "updated … ago" shows how old each player's data is; press <em>↻</em> or <em>Refresh all</em> after you play.
+        "updated … ago" shows how old each player's data is; press the <em>refresh</em> icon or <em>Refresh all</em> after you play.
       </li>
       <li>
-        <b>Share.</b> The page address holds the players and the page you're on. Press <em>🔗</em> to copy it and send it to your friends.
+        <b>Share.</b> The page address holds the players and the page you're on. Press the <em>link</em> button to copy it and send it to your friends.
       </li>
     </ol>
     <div class="tour">
@@ -191,11 +213,11 @@
   </dialog>
 
   <dialog id="unlock" class="unlock">
-    <button class="u-close" aria-label="Close" autofocus>✕</button>
+    <button class="u-close" aria-label="Close" autofocus><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
     <div id="unlock-body"></div>
   </dialog>
 
-  <button class="to-top" id="to-top" hidden aria-label="Back to top" title="Back to top">↑</button>
+  <button class="to-top" id="to-top" hidden aria-label="Back to top" title="Back to top"><svg class="ico" aria-hidden="true"><use href="#i-up"/></svg></button>
 
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
