@@ -755,8 +755,29 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
   transition: transform .12s, box-shadow .12s;
 }
 .pool-item:hover { transform: translateY(-2px); box-shadow: 0 4px 0 rgba(0,0,0,.2); border-color: var(--ink); }
-.pool-item.q4 { background: rgba(242, 201, 76, .35); }
-.pool-item.q3 { background: rgba(242, 201, 76, .15); }
+/* Quality: no background tint (it read as a highlight/selection and 3 vs 4 looked alike).
+   Quality 3 = gold border. Quality 4 = shimmering gold border plus a sheen that sweeps across now and then. */
+.pool-item.q3 { border-color: #c9a227; }
+.pool-item.q4 { position: relative; border-color: transparent; box-shadow: 0 0 8px rgba(242, 201, 76, .6); }
+.pool-item.q4:hover { border-color: transparent; box-shadow: 0 4px 0 rgba(0,0,0,.2), 0 0 10px rgba(242, 201, 76, .8); }
+/* The ring: a moving gold gradient masked to the 2px border, so the card keeps the same fill as the others. */
+.pool-item.q4::before, .pool-item.q4::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none; }
+.pool-item.q4::before {
+  padding: 2px;
+  background: linear-gradient(110deg, #8a5a00, #e0a800, #ffe27a, #e0a800, #8a5a00, #e0a800, #ffe27a, #e0a800, #8a5a00) 0 0 / 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: q4-ring 4s linear infinite;
+}
+/* The sheen: a light streak that crosses the card every few seconds. */
+.pool-item.q4::after {
+  background: linear-gradient(110deg, transparent 42%, rgba(255, 246, 200, .8) 50%, transparent 58%) 0 0 / 300% 100% no-repeat;
+  animation: q4-sheen 3.5s ease-in-out infinite;
+}
+.pool-item.q4 .qual { color: #c99700; text-shadow: 0 0 4px rgba(242, 201, 76, .9); }
+@keyframes q4-ring { to { background-position: -150% 0; } }
+@keyframes q4-sheen { 0%, 50% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .pool-item.q4::before { animation: none; } .pool-item.q4::after { display: none; } }
 .pool-item.locked { opacity: .6; border-style: dashed; }
 .pool-top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
 .pool-name { font-family: var(--font-heading); font-size: 18px; line-height: 1.1; }
