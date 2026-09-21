@@ -159,11 +159,10 @@
       <p class="spin-intro"><b>What does Spindown Dice do?</b> It turns every item on a pedestal into the item with the ID one lower, skipping items that aren't unlocked. Type the item you see to find out what you'll get after 1, 2, 3… uses.</p>
       <p class="estimate"><b>This is an estimate.</b> Unlocked items are guessed from Steam achievements. Your save can differ (for example after a save reset or an Alt+F2 sync), and a co-op run follows one save file, most likely the host's. Hidden items like Recall and Hold are always skipped.</p>
       <div class="spin-controls">
-        <label class="spin-field">Unlocks from
+        <label class="spin-field">Items that count
           <select id="spin-source"></select>
         </label>
         <p class="spin-help" id="spin-source-help"></p>
-        <label class="check dark"><input type="checkbox" id="spin-all"> Ignore unlocks (every item counts)</label>
         <label class="spin-field">Uses
           <select id="spin-steps"><option>5</option><option>10</option><option>20</option></select>
         </label>
@@ -179,7 +178,7 @@
   <div class="view" id="view-pool" hidden>
     <section class="sheet">
       <div class="sheet-head"><h2>Item pool <span class="beta-tag">estimate</span></h2></div>
-      <p class="spin-intro"><b>Which items can show up for your lobby?</b> By default only items <i>all of you</i> have unlocked (shared). Switch to anyone, one save, or locked. Click an item to see how to unlock it.</p>
+      <p class="spin-intro"><b>Which items can show up for your lobby?</b> By default: items <i>all of you</i> have unlocked. Switch to every item or to one player's unlocks. Click an item to see how to unlock it.</p>
       <p class="estimate"><b>This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to.</p>
       <div class="spin-controls">
         <label class="spin-field">Show
@@ -221,7 +220,7 @@
       <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
       <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
       <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
-      <button data-go="pool"><b>Items (estimate)</b><span>Items your whole lobby has unlocked (shared), or per player. Click one for how to unlock it. Guessed from Steam achievements, so it can differ from your save.</span></button>
+      <button data-go="pool"><b>Items (estimate)</b><span>Items your whole lobby has unlocked, every item, or one player's unlocks. Click one for how to unlock it. Guessed from Steam achievements, so it can differ from your save.</span></button>
     </div>
     <p class="intro-foot"><b>Keys:</b> <kbd>1</kbd>–<kbd>6</kbd> switch pages · <kbd>←</kbd> <kbd>→</kbd> characters or bosses · <kbd>/</kbd> item search · <kbd>?</kbd> this help.</p>
     <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.

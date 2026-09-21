@@ -32,8 +32,8 @@
     chalFilter: 'all',
     boss: 'mother', bossMode: 'boss', bossFilter: 'all', bossHideDone: false,
     squad: { goals: {}, dupes: false },
-    spin: { source: 'union', all: false, steps: 10, item: null },
-    pool: { mode: 'everyone', q: '', minQ: 0, sort: 'id' },
+    spin: { source: 'shared', steps: 10, item: null },
+    pool: { mode: 'shared', q: '', minQ: 0, sort: 'id' },
   };
 
   // ---------- persistence ----------
@@ -979,45 +979,61 @@
   function spinOwners(it) {
     return loaded().filter((p) => !it.ach || p.unlocked.has(it.ach));
   }
+
+  // Which items count, shared by Spindown and Items: 'all' = every item, 'shared' = unlocked by every
+  // loaded player (the default), or a player's path = unlocked on that player's save.
+  function lockedFor(it, mode) {
+    if (mode === 'all' || !it.ach) return [];
+    return loaded().filter((p) => (mode === 'shared' || p.path === mode) && !p.unlocked.has(it.ach));
+  }
+  const itemIn = (it, mode) => mode === 'all' || !it.ach || (loaded().length > 0 && !lockedFor(it, mode).length);
+  function unlockModes() {
+    const ps = loaded();
+    const visible = [...itemById.values()].filter((it) => !it.hidden);
+    const n = (mode) => visible.filter((it) => itemIn(it, mode)).length;
+    const shared = ps.length > 1 ? 'Unlocked by all of us' : ps.length ? `Unlocked by ${pname(ps[0])}` : 'Unlocked from the start';
+    return [['all', `All items (ignore unlocks) · ${n('all')}`], ['shared', `${shared} · ${n('shared')}`],
+      ...(ps.length > 1 ? ps.map((p) => [p.path, `Unlocked by ${pname(p)} · ${n(p.path)}`]) : [])];
+  }
+  // Fills a mode <select> and returns the mode to use (falls back to 'shared' if the saved one is gone).
+  function fillModeSelect(sel, mode) {
+    const modes = unlockModes();
+    if (!modes.some(([v]) => v === mode)) mode = 'shared';
+    sel.innerHTML = modes.map(([v, l]) => `<option value="${esc(v)}"${v === mode ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    return mode;
+  }
+
   // Why an ID is skipped, or null if Spindown can land on it.
   function skipReason(id) {
     const it = itemById.get(id);
     if (!it) return 'no item with this ID';
     if (it.hidden) return 'hidden item';
-    if (state.spin.all || !it.ach) return null;
-    const ps = loaded();
-    const p = state.spin.source !== 'union' && ps.find((x) => x.path === state.spin.source);
-    if (!p) return ps.some((x) => x.unlocked.has(it.ach)) ? null : 'locked for everyone';
-    return p.unlocked.has(it.ach) ? null : `locked for ${pname(p)}`;
+    if (itemIn(it, state.spin.source)) return null;
+    const who = lockedFor(it, state.spin.source);
+    return who.length ? `locked for ${who.map(pname).join(', ')}` : 'not unlocked from the start';
   }
 
   const qualityStars = (q) => `<span class="qual q${q}" title="Quality ${q}">${'★'.repeat(q)}${'☆'.repeat(4 - q)}</span>`;
   const ownerDots = (it) => {
-    if (!it.ach || loaded().length < 2 || state.spin.all) return '';
+    if (!it.ach || loaded().length < 2 || state.spin.source === 'all') return '';
     const owners = spinOwners(it);
     return `<span class="who" title="Unlocked for: ${esc(owners.map(pname).join(', ') || 'nobody')}">${owners.map((p) => `<i style="background:${p.color}"></i>`).join('')}</span>`;
   };
 
   function renderSpindown() {
     const ps = loaded();
-    const visible = [...itemById.values()].filter((it) => !it.hidden);
-    const count = (has) => visible.filter((it) => !it.ach || has(it.ach)).length;
-    const sources = [['union', `${ps.length > 1 ? 'Everyone combined (union)' : ps.length ? `${pname(ps[0])}'s save` : 'No players loaded'} · ${count((a) => ps.some((p) => p.unlocked.has(a)))} items`]]
-      .concat(ps.length > 1 ? ps.map((p) => [p.path, `${pname(p)}'s save · ${count((a) => p.unlocked.has(a))} items`]) : []);
-    if (!sources.some(([v]) => v === state.spin.source)) state.spin.source = 'union';
-    $('#spin-source').innerHTML = sources.map(([v, l]) => `<option value="${esc(v)}"${v === state.spin.source ? ' selected' : ''}>${esc(l)}</option>`).join('');
-    $('#spin-source').disabled = state.spin.all;
+    state.spin.source = fillModeSelect($('#spin-source'), state.spin.source);
     const host = ps.find((p) => p.path === state.spin.source);
-    $('#spin-source-help').innerHTML = state.spin.all ? 'Every item counts, as on a save with everything unlocked.'
-      : ps.length < 2 ? 'Spindown skips items that aren’t unlocked on this save.'
+    $('#spin-source-help').innerHTML = state.spin.source === 'all' ? 'Every item counts, like on a save with everything unlocked.'
       : host ? `Only items unlocked on <b>${esc(pname(host))}</b>’s save count. Pick whoever hosts the run.`
-      : '<b>Union</b>: an item counts if <i>anyone</i> has it unlocked. Good for a quick look, but a real run uses one save (usually the host’s), so pick the host for exact results.';
-    $('#spin-all').checked = state.spin.all;
+      : ps.length > 1 ? 'Only items <b>all of you</b> have unlocked count. For exact results pick the host’s save: a co-op run uses that one.'
+      : ps.length ? 'Spindown skips items that aren’t unlocked on this save.'
+      : 'No players loaded, so only items unlocked from the start count.';
     $('#spin-steps').value = String(state.spin.steps);
 
     const cur = itemById.get(state.spin.item);
     if (!cur) { $('#spin-out').innerHTML = '<p class="empty-hint light">Search for the item on the pedestal to see what Spindown Dice turns it into.</p>'; return; }
-    const warn = !state.spin.all && !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked count. Add players or tick "Ignore unlocks".</p>' : '';
+    const warn = state.spin.source !== 'all' && !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked count. Add players or pick "All items".</p>' : '';
 
     // Forward: what this item becomes after 1..N uses.
     let fwd = '', id = cur.id;
@@ -1097,38 +1113,21 @@
 
   function renderPool() {
     const ps = loaded();
-    // 'everyone' (default) = items all of us have (intersection); 'any' = items at least one of us has.
-    const many = ps.length > 1;
-    const modes = [['everyone', many ? 'Unlocked by all of us (shared)' : 'Unlocked'], ...(many ? [['any', 'Unlocked by anyone']] : []),
-      ...(many ? ps.map((p) => [p.path, `${pname(p)}'s save`]) : []), ['locked', 'Locked']];
-    if (!modes.some(([v]) => v === state.pool.mode)) state.pool.mode = 'everyone';
-    $('#pool-mode').innerHTML = modes.map(([v, l]) => `<option value="${esc(v)}"${v === state.pool.mode ? ' selected' : ''}>${esc(l)}</option>`).join('');
+    state.pool.mode = fillModeSelect($('#pool-mode'), state.pool.mode);
     $('#pool-quality').value = String(state.pool.minQ);
     $('#pool-sort').value = state.pool.sort;
     if ($('#pool-search').value !== state.pool.q) $('#pool-search').value = state.pool.q;
 
     const all = [...itemById.values()].filter((it) => !it.hidden);
-    const inMode = (it) => {
-      const owners = poolOwners(it);
-      switch (state.pool.mode) {
-        case 'any': return !it.ach || owners.length > 0;
-        case 'everyone': return !it.ach || (ps.length > 0 && owners.length === ps.length);
-        case 'locked': return !!it.ach && owners.length === 0;
-        default: return !it.ach || owners.some((p) => p.path === state.pool.mode);
-      }
-    };
-    const matching = all.filter(inMode);
+    const matching = all.filter((it) => itemIn(it, state.pool.mode));
     const q = state.pool.q.trim().toLowerCase().replace(/^#/, '');
     let shown = matching.filter((it) => it.quality >= state.pool.minQ
       && (!q || it.name.toLowerCase().includes(q) || String(it.id) === q || (it.desc || '').toLowerCase().includes(q)));
     const by = { id: (a, b) => a.id - b.id, name: (a, b) => a.name.localeCompare(b.name), quality: (a, b) => b.quality - a.quality || a.id - b.id };
     shown.sort(by[state.pool.sort] || by.id);
 
-    const lockedCount = all.filter((it) => it.ach && poolOwners(it).length === 0).length;
-    const summary = state.pool.mode === 'locked'
-      ? `<b>${matching.length}</b> items nobody has unlocked yet`
-      : `<b>${matching.length}</b> of ${all.length} items available · ${lockedCount} still locked for everyone`;
-    const hint = !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked are shown. Add players at the top.</p>' : '';
+    const summary = `<b>${matching.length}</b> of ${all.length} items`;
+    const hint = !ps.length && state.pool.mode !== 'all' ? '<p class="spin-note">No players loaded, so only items that start unlocked are shown. Add players at the top.</p>' : '';
     $('#pool-ages').innerHTML = ps.length ? `Steam data: ${ps.map((p) => `<span class="age age-${ageClass(p.fetchedAt)}"><i style="background:${p.color}"></i>${esc(pname(p))} ${ago(p.fetchedAt)}</span>`).join(' ')}` : '';
 
     $('#pool-summary').innerHTML = `${summary}${shown.length !== matching.length ? ` · showing ${shown.length}` : ''}`;
@@ -1137,7 +1136,7 @@
       const dots = it.ach && ps.length > 1 ? `<span class="who">${ps.map((p) => `<i style="${owners.includes(p) ? `background:${p.color}` : ''}" title="${esc(pname(p))}: ${owners.includes(p) ? 'unlocked' : 'locked'}"></i>`).join('')}</span>` : '';
       const tag = !it.ach ? '<span class="pool-tag">starts unlocked</span>' : '';
       const how = it.ach ? `Unlock: ${achUnlock(it.ach)}` : 'Available from the start';
-      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}\n${esc(how)}\nClick for how to unlock it">
+      return `<button class="pool-item q${it.quality}${it.ach && ps.length && owners.length < ps.length ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}\n${esc(how)}\nClick for how to unlock it">
         <span class="pool-top"><span class="iid">#${it.id}</span>${qualityStars(it.quality)}</span>
         <span class="pool-name">${esc(it.name)}</span>
         <span class="pool-bottom">${tag}${dots}</span>
@@ -1357,7 +1356,6 @@
     showView('spindown');
   });
   $('#spin-source').addEventListener('change', (e) => { state.spin.source = e.target.value; save(); renderSpindown(); });
-  $('#spin-all').addEventListener('change', (e) => { state.spin.all = e.target.checked; save(); renderSpindown(); });
   $('#spin-steps').addEventListener('change', (e) => { state.spin.steps = +e.target.value; save(); renderSpindown(); });
 
   $('#note').addEventListener('click', (e) => {
