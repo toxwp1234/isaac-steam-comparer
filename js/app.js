@@ -48,13 +48,17 @@
     writeUrl();
   }
 
-  // ---------- shareable link: ?p1=<steamID64 or custom URL name>&p2=… ----------
+  // ---------- shareable link: ?p1=<steamID64 or custom URL name>&p2=…&view=marks&char=isaac ----------
+  const VIEWS = ['marks', 'challenges', 'squad', 'spindown', 'pool'];
   const urlId = (p) => p.sid || (p.path.startsWith('profiles/') ? p.path.slice(9) : p.path.slice(3));
 
   function writeUrl() {
     const q = new URLSearchParams(location.search);
     for (let i = 1; i <= MAX_PLAYERS; i++) q.delete(`p${i}`);
+    q.delete('view'); q.delete('char');
     state.players.forEach((p, i) => q.set(`p${i + 1}`, urlId(p)));
+    q.set('view', state.view);
+    if (state.view === 'marks') q.set('char', state.selected);
     const search = q.toString();
     const url = `${location.pathname}${search ? `?${search}` : ''}${location.hash}`;
     if (url !== `${location.pathname}${location.search}${location.hash}`) history.replaceState(null, '', url);
@@ -63,6 +67,11 @@
   // Players in the link win over the saved list; saved data for the same profile is reused.
   function readUrl() {
     const q = new URLSearchParams(location.search);
+    if (VIEWS.includes(q.get('view'))) state.view = q.get('view');
+    if (charById[q.get('char')]) {
+      state.selected = q.get('char');
+      if (state.filter !== 'all' && (state.filter === 'tainted') !== charById[state.selected].tainted) state.filter = 'all';
+    }
     const ids = [];
     for (let i = 1; i <= MAX_PLAYERS; i++) { const v = (q.get(`p${i}`) || '').trim(); if (v) ids.push(v); }
     if (!ids.length) return;
@@ -105,15 +114,26 @@
     return null;
   }
 
+  // The relay that answered last is tried first next time (remembered in this browser).
+  const RELAY_KEY = 'isaac-coop-marks.relay';
+  function relayOrder() {
+    let first = null;
+    try { first = localStorage.getItem(RELAY_KEY); } catch (e) { /* storage blocked */ }
+    return [...RELAYS].sort((a, b) => (b.name === first) - (a.name === first));
+  }
+
   async function relayFetch(steamUrl, looksValid) {
     let lastErr = 'No relay reachable';
-    for (const r of RELAYS) {
+    for (const r of relayOrder()) {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 20000);
       try {
         const res = await fetch(r.url(steamUrl), { headers: r.headers || {}, signal: ctl.signal });
         const text = await res.text();
-        if (res.ok && looksValid(text)) return text;
+        if (res.ok && looksValid(text)) {
+          try { localStorage.setItem(RELAY_KEY, r.name); } catch (e) { /* storage blocked */ }
+          return text;
+        }
         lastErr = `${r.name}: HTTP ${res.status}`;
       } catch (e) {
         lastErr = `${r.name}: ${e.name === 'AbortError' ? 'timeout' : 'network error'}`;
@@ -143,10 +163,11 @@
     return unlocked;
   }
 
-  async function loadPlayer(p) {
+  async function loadPlayer(p, quiet = false) {
     p.status = 'loading'; p.error = null;
     render();
     const base = `https://steamcommunity.com/${p.path}`;
+    const before = p.unlocked;
     try {
       const achXml = await relayFetch(`${base}/stats/${APP_ID}/achievements/?xml=1&l=english`,
         (t) => /<playerstats|<error>/i.test(t));
@@ -154,6 +175,7 @@
       p.fetchedAt = Date.now();
       p.status = 'ok';
       render();
+      const fresh = before ? [...p.unlocked].filter((id) => !before.has(id)) : [];
       try {
         const prof = await relayFetch(`${base}/?xml=1`, (t) => /<profile|<steamid>/i.test(t));
         p.name = tag(prof, 'steamID') || p.name;
@@ -162,25 +184,63 @@
         if (/^\d{17}$/.test(sid || '')) p.sid = sid;
       } catch (e) { /* name/avatar are optional */ }
       rememberPlayer(p);
-      const pct = overallProgress(p);
-      showToast(`✓ ${pname(p)} loaded: ${pct}% of all marks`, 'ok');
+      if (fresh.length) showToast(`🎉 ${pname(p)} unlocked something new: ${newUnlockText(fresh)}`, 'ok', 8000);
+      else if (!quiet) showToast(`✓ ${pname(p)} loaded: ${overallProgress(p)}% of all marks`, 'ok');
     } catch (e) {
       p.status = 'error';
       p.error = friendlyError(e.message);
-      showToast(`${pname(p)}: ${p.error}`, 'err', 7000);
+      showToast(`${pname(p)}: ${p.error.title}. Click the player for help.`, 'err', 7000);
     }
     save();
     render();
   }
 
-  // Turn Steam / relay errors into something a player can act on.
-  function friendlyError(msg) {
-    if (/private|friendsonly/i.test(msg)) return '❌ Game details are private. On Steam: Edit Profile → Privacy Settings → set "Game details" to Public.';
-    if (/could not be found|not found|404/i.test(msg)) return '❌ Profile not found. Use steamcommunity.com/id/NAME, steamcommunity.com/profiles/7656… or the 17-digit Steam ID.';
-    if (/timeout/i.test(msg)) return '⏱ Steam took too long to answer. Press ↻ to try again.';
-    if (/HTTP|network|relay/i.test(msg)) return '🌐 Could not reach Steam. Check your internet and press ↻ to retry.';
-    return `❌ ${msg}`;
+  // "Hush on Isaac, Mom's Heart on Cain and 2 more achievements"
+  // "Hush on Isaac" for a completion-mark achievement, null for any other achievement.
+  function markForAch(id) {
+    for (const ch of CHARACTERS) {
+      const m = MARKS.find((x) => ch.ach[x.key] === id);
+      if (m) return `${m.label} on ${ch.name}`;
+    }
+    return null;
   }
+  function newUnlockText(ids) {
+    const names = ids.map(markForAch).filter(Boolean);
+    const shown = names.slice(0, 3);
+    const rest = ids.length - shown.length;
+    return shown.length ? `${shown.join(', ')}${rest ? ` and ${rest} more achievement${rest === 1 ? '' : 's'}` : ''}`
+      : `${ids.length} new achievement${ids.length === 1 ? '' : 's'}`;
+  }
+
+  // Turn Steam / relay errors into something a player can act on: a short title plus the steps to fix it.
+  function friendlyError(msg) {
+    if (/private|friendsonly/i.test(msg)) return { kind: 'private', title: 'Game details are private',
+      help: 'Steam only shows achievements of public profiles. On Steam: your profile → <b>Edit Profile</b> → <b>Privacy Settings</b> → set <b>My profile</b> and <b>Game details</b> to <b>Public</b>. Then press <b>Try again</b>. It can take a few minutes for Steam to update.' };
+    if (/could not be found|not found|404|invalid/i.test(msg)) return { kind: 'notfound', title: 'Profile not found',
+      help: 'Check the link or ID. Use <b>steamcommunity.com/id/NAME</b>, <b>steamcommunity.com/profiles/7656…</b> or the 17-digit Steam ID. A custom URL name only works if the player set one in their Steam profile.' };
+    if (/no stats|not own|game/i.test(msg)) return { kind: 'nogame', title: 'No Isaac stats on this profile',
+      help: 'Steam has no Binding of Isaac: Rebirth achievements for this profile. Make sure the player owns the game on this account and has played it at least once.' };
+    if (/timeout/i.test(msg)) return { kind: 'timeout', title: 'Steam took too long to answer',
+      help: 'The site reads Steam through free public relays and they can be slow. Wait a moment and press <b>Try again</b>.' };
+    if (/HTTP|network|relay/i.test(msg)) return { kind: 'network', title: 'Could not reach Steam',
+      help: 'The site reads Steam through free public relays, and none of them answered. Check your internet, wait a moment and press <b>Try again</b>. If Steam itself is down, try later.' };
+    return { kind: 'other', title: 'Steam returned an error', help: `Steam said: <i>${esc(msg)}</i>. Press <b>Try again</b>, or check the profile link.` };
+  }
+
+  // ---------- data age ----------
+  const DAY = 86400000;
+  const AUTO_REFRESH_AFTER = 6 * 3600000; // saved data older than this reloads on page open
+  function ago(t) {
+    if (!t) return 'never';
+    const s = (Date.now() - t) / 1000;
+    if (s < 90) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    const d = Math.round(s / 86400);
+    return d === 1 ? 'yesterday' : `${d} days ago`;
+  }
+  // fresh < 1 day, old 1–7 days, stale > 7 days
+  const ageClass = (t) => !t ? 'stale' : Date.now() - t < DAY ? 'fresh' : Date.now() - t < 7 * DAY ? 'old' : 'stale';
 
   // Share of all known completion marks (every character) this player has.
   function overallProgress(p) {
@@ -238,25 +298,54 @@
   // ---------- rendering: players ----------
   function renderPlayers() {
     $('#players').innerHTML = state.players.map((p, i) => {
-      const status = p.status === 'loading' ? 'loading from Steam…'
-        : p.status === 'error' ? esc(p.error || 'failed')
-        : p.unlocked ? '' : 'not loaded';
+      const status = p.status === 'loading' ? '<span class="status">loading from Steam…</span>'
+        : p.status === 'error' ? `<button class="status err" data-act="error" title="What went wrong and how to fix it">⚠ ${esc(p.error ? p.error.title : 'Failed')} · <u>help</u></button>`
+        : p.unlocked ? '' : '<span class="status">not loaded</span>';
       const pct = p.unlocked ? overallProgress(p) : 0;
       const progress = p.unlocked && p.status !== 'loading'
         ? `<span class="player-progress" title="${pct}% of all completion marks · ${p.unlocked.size} achievements"><span class="progress-bar"><span class="progress-fill" style="--progress:${pct}%;--pc:${p.color}"></span></span>${pct}% marks</span>` : '';
+      const age = p.unlocked && p.status !== 'loading'
+        ? `<span class="age age-${ageClass(p.fetchedAt)}" title="Steam data fetched ${p.fetchedAt ? new Date(p.fetchedAt).toLocaleString() : 'at an unknown time'}. Press ↻ to refresh.">updated ${ago(p.fetchedAt)}</span>` : '';
       return `<div class="player${p.status === 'loading' ? ' loading' : ''}${p.status === 'error' ? ' err' : ''}" data-i="${i}">
-        <label class="swatch" style="background:${p.color}" title="Change color"><input type="color" value="${p.color}" data-act="color"></label>
+        <label class="swatch" style="background:${p.color}" title="Click to change ${esc(pname(p))}'s color"><input type="color" value="${p.color}" data-act="color" aria-label="Change ${esc(pname(p))}'s color"></label>
         ${p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}
-        <div class="who"><span class="name">${esc(pname(p))}</span>${status ? `<span class="status${p.status === 'error' ? ' err' : ''}">${status}</span>` : ''}${progress}</div>
-        <button class="mini" data-act="reload" title="Refresh">↻</button>
-        <button class="mini" data-act="remove" title="Remove">✕</button>
+        <div class="who"><span class="name">${esc(pname(p))}</span>${status}${progress}${age}</div>
+        <button class="mini" data-act="reload" title="Refresh from Steam" aria-label="Refresh ${esc(pname(p))}">↻</button>
+        <button class="mini" data-act="remove" title="Remove from lobby" aria-label="Remove ${esc(pname(p))}">✕</button>
       </div>`;
     }).join('');
     const full = state.players.length >= MAX_PLAYERS;
     $('#add-input').disabled = full;
     $('#add-form button').disabled = full;
     $('#add-input').placeholder = full ? `Max ${MAX_PLAYERS} players` : 'steamcommunity.com/id/NAME or 76561198…';
+    const busy = state.players.some((p) => p.status === 'loading');
+    $('#refresh-all').hidden = !state.players.length;
+    $('#refresh-all').disabled = busy;
+    $('#refresh-all').textContent = busy ? '↻ Refreshing…' : '↻ Refresh all';
+    const stale = state.players.filter((p) => p.unlocked && p.status !== 'loading' && ageClass(p.fetchedAt) === 'stale');
+    $('#stale-banner').hidden = !stale.length;
+    if (stale.length) {
+      $('#stale-banner-text').textContent = `${stale.map(pname).join(', ')}: Steam data is over a week old, so marks, squads and items may be out of date.`;
+    }
     renderRecent();
+  }
+
+  function refreshAll() {
+    state.players.filter((p) => p.status !== 'loading').forEach((p) => loadPlayer(p, true));
+  }
+
+  function openError(i) {
+    const p = state.players[i];
+    if (!p || !p.error) return;
+    $('#unlock-body').innerHTML = `<p class="u-kind">${esc(pname(p))} · couldn't load from Steam</p>
+      <h3>${esc(p.error.title)}</h3>
+      <p>${p.error.help}</p>
+      <p class="u-note">${p.unlocked ? `Showing the data from ${ago(p.fetchedAt)} until it loads.` : 'Nothing is shown for this player until it loads.'}</p>
+      <div class="u-actions">
+        <a class="u-wiki" href="https://steamcommunity.com/${esc(p.path)}" target="_blank" rel="noopener">Open the Steam profile ↗</a>
+        <button class="btn" data-retry="${i}">↻ Try again</button>
+      </div>`;
+    $('#unlock').showModal();
   }
 
   // ---------- recently checked players (kept in this browser, max 12) ----------
@@ -281,12 +370,16 @@
     const list = recent.map((r, i) => ({ r, i })).filter(({ r }) => !state.players.some((p) => samePlayer(r, p)));
     const full = state.players.length >= MAX_PLAYERS;
     $('#recent').hidden = !list.length;
-    $('#recent').innerHTML = list.length ? `<span class="recent-label">Recent:</span>${list.map(({ r, i }) => `
-      <span class="recent-item">
-        <button class="recent-add" data-recent="${i}"${full ? ' disabled' : ''} title="${full ? `Max ${MAX_PLAYERS} players` : `Add ${esc(r.name)} again`}">
-          ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(r.name)}</span>
-        </button><button class="recent-forget" data-forget="${i}" aria-label="Forget ${esc(r.name)}" title="Forget">✕</button>
-      </span>`).join('')}` : '';
+    $('#recent').innerHTML = list.length ? `<span class="recent-label" title="Players you checked before in this browser. Click one to add them to the lobby; their data reloads from Steam.">Quick add <small>(checked before, reloads on add)</small>:</span>${list.map(({ r, i }) => {
+      const old = !r.fetchedAt || Date.now() - r.fetchedAt > 30 * DAY;
+      const tip = full ? `Max ${MAX_PLAYERS} players` : `Add ${r.name} again. Last checked ${ago(r.fetchedAt)}${old ? ' (over a month ago)' : ''}; their data reloads from Steam.`;
+      return `
+      <span class="recent-item${old ? ' old' : ''}">
+        <button class="recent-add" data-recent="${i}"${full ? ' disabled' : ''} title="${esc(tip)}">
+          ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<span>${esc(r.name)}</span><small class="recent-age">🕑 ${esc(ago(r.fetchedAt))}</small>
+        </button><button class="recent-forget" data-forget="${i}" aria-label="Forget ${esc(r.name)}" title="Forget this player (removes their saved data from this browser)">✕</button>
+      </span>`;
+    }).join('')}` : '';
   }
 
   // ---------- rendering: marks view ----------
@@ -421,18 +514,26 @@
   function renderChallenges() {
     const ps = loaded();
     $$('#chal-filter .tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.f === state.chalFilter));
-    if (!ps.length) { $('#chal-list').innerHTML = '<p class="empty-hint light">Add a player to see challenge progress.</p>'; return; }
-    const rows = CHALLENGES.map((c) => ({ c, st: ps.map((p) => ({ p, s: chalStatus(c, p) })) }))
-      .filter(({ st }) => {
-        const all = (s) => st.every((x) => x.s === s);
-        const some = (s) => st.some((x) => x.s === s);
-        switch (state.chalFilter) {
-          case 'ready': return !some('lock') && !all('done');
-          case 'todo': return !all('done');
-          case 'locked': return some('lock');
-          default: return true;
-        }
-      });
+    if (!ps.length) {
+      $$('#chal-filter .tab .n').forEach((n) => { n.textContent = ''; });
+      $('#chal-list').innerHTML = '<p class="empty-hint light">Add a player to see challenge progress.</p>';
+      return;
+    }
+    const inFilter = (f, st) => {
+      const all = (s) => st.every((x) => x.s === s);
+      const some = (s) => st.some((x) => x.s === s);
+      switch (f) {
+        case 'ready': return !some('lock') && !all('done');
+        case 'todo': return !all('done');
+        case 'locked': return some('lock');
+        default: return true;
+      }
+    };
+    const every = CHALLENGES.map((c) => ({ c, st: ps.map((p) => ({ p, s: chalStatus(c, p) })) }));
+    $$('#chal-filter .tab').forEach((t) => {
+      t.querySelector('.n').textContent = every.filter(({ st }) => inFilter(t.dataset.f, st)).length;
+    });
+    const rows = every.filter(({ st }) => inFilter(state.chalFilter, st));
     $('#chal-list').innerHTML = rows.map(({ c, st }) => {
       const ch = charByName[c.char] || charById.isaac;
       const locked = st.filter((x) => x.s === 'lock');
@@ -551,6 +652,25 @@
     return `<span class="goal-mark" title="${esc(m.label)} on ${esc(c.name)}">${markSvg(m.icon, [{ color: p.color }], 'known', state.hard)}<span>${esc(m.label)}</span></span>`;
   }).join('');
 
+  // Each part of the win-chance rating, with the points it adds, so the % is not a black box.
+  function whyTable(sq) {
+    const w = sq.why;
+    const row = (label, val, max, pts, how) => `<tr><th>${label}</th><td class="v">${val}${max ? ` <small>/ ${max}</small>` : ''}</td>
+      <td class="pts ${pts < 0 ? 'neg' : ''}">${pts >= 0 ? '+' : '−'}${Math.abs(pts).toFixed(2)}</td><td class="how">${how}</td></tr>`;
+    return `<table class="why-table">
+      <thead><tr><th>Part</th><th>Value</th><th>Points</th><th>From</th></tr></thead>
+      <tbody>
+        ${row('Kill speed', w.kill.toFixed(1), 5, 0.45 * w.kill, 'best + average <a href="#tier-list">Damage</a>')}
+        ${row('Staying alive', w.alive.toFixed(1), 5, 0.35 * w.alive, 'best + average <a href="#tier-list">Survival</a> (dead players keep going as ghosts)')}
+        ${row('Team help', w.help, 6, 0.3 * w.help, sq.members.length > 1 ? 'sum of <a href="#tier-list">Team help</a>' : 'solo: no teammates to help')}
+        ${row('Team cost', w.cost, 0, -0.2 * w.cost, 'sum of <a href="#tier-list">Team cost</a>')}
+        ${row('Skill load', w.skill.toFixed(1), 0, -0.25 * w.skill, 'average <a href="#tier-list">Skill</a> above 2.5')}
+      </tbody>
+      <tfoot><tr><th>Rating</th><td></td><td class="pts">${w.rating.toFixed(2)}</td><td class="how">win chance = 10% + 17% × rating = <b>${Math.round(w.win * 100)}%</b> (kept between 5% and 95%)</td></tr></tfoot>
+    </table>
+    <p class="why-note">An estimate from the characters' starting kits, not real game data. Squad score ${sq.value.toFixed(1)} = win chance × marks on the route (bonus marks ${BONUS_WEIGHT}×, weighted by goal).</p>`;
+  }
+
   function renderSquad() {
     const ps = loaded();
     if (!ps.length) {
@@ -623,15 +743,8 @@
             </div>
           </div>
           <details class="why-wrap">
-            <summary>Why this squad?</summary>
-            <div class="why">
-              <span title="0.6 × best Damage + 0.4 × average Damage">Kill speed <b>${sq.why.kill.toFixed(1)}</b></span>
-              <span title="0.5 × best Survival + 0.5 × average Survival">Staying alive <b>${sq.why.alive.toFixed(1)}</b></span>
-              <span title="Sum of Team help, each character once, max 6">Team help <b>+${sq.why.help}</b></span>
-              <span title="Sum of Team cost">Team cost <b>−${sq.why.cost}</b></span>
-              <span title="How far the average Skill is above 2.5">Skill load <b>−${sq.why.skill.toFixed(1)}</b></span>
-              <span title="Win chance × marks on the chosen route (bonus marks count ${BONUS_WEIGHT}×, weighted by goal)">Score <b>${sq.value.toFixed(1)}</b></span>
-            </div>
+            <summary>Why ${pct}% win?</summary>
+            ${whyTable(sq)}
           </details>
         </article>`;
       }).join('');
@@ -678,11 +791,18 @@
 
   function renderSpindown() {
     const ps = loaded();
-    const sources = [['union', ps.length > 1 ? 'Everyone combined (union)' : ps.length ? `${pname(ps[0])}'s save` : 'No players loaded']]
-      .concat(ps.length > 1 ? ps.map((p) => [p.path, `${pname(p)}'s save`]) : []);
+    const visible = [...itemById.values()].filter((it) => !it.hidden);
+    const count = (has) => visible.filter((it) => !it.ach || has(it.ach)).length;
+    const sources = [['union', `${ps.length > 1 ? 'Everyone combined (union)' : ps.length ? `${pname(ps[0])}'s save` : 'No players loaded'} · ${count((a) => ps.some((p) => p.unlocked.has(a)))} items`]]
+      .concat(ps.length > 1 ? ps.map((p) => [p.path, `${pname(p)}'s save · ${count((a) => p.unlocked.has(a))} items`]) : []);
     if (!sources.some(([v]) => v === state.spin.source)) state.spin.source = 'union';
     $('#spin-source').innerHTML = sources.map(([v, l]) => `<option value="${esc(v)}"${v === state.spin.source ? ' selected' : ''}>${esc(l)}</option>`).join('');
     $('#spin-source').disabled = state.spin.all;
+    const host = ps.find((p) => p.path === state.spin.source);
+    $('#spin-source-help').innerHTML = state.spin.all ? 'Every item counts, as on a save with everything unlocked.'
+      : ps.length < 2 ? 'Spindown skips items that aren’t unlocked on this save.'
+      : host ? `Only items unlocked on <b>${esc(pname(host))}</b>’s save count. Pick whoever hosts the run.`
+      : '<b>Union</b>: an item counts if <i>anyone</i> has it unlocked. Good for a quick look, but a real run uses one save (usually the host’s), so pick the host for exact results.';
     $('#spin-all').checked = state.spin.all;
     $('#spin-steps').value = String(state.spin.steps);
 
@@ -798,13 +918,15 @@
       ? `<b>${matching.length}</b> items nobody has unlocked yet`
       : `<b>${matching.length}</b> of ${all.length} items available · ${lockedCount} still locked for everyone`;
     const hint = !ps.length ? '<p class="spin-note">No players loaded, so only items that start unlocked are shown. Add players at the top.</p>' : '';
+    $('#pool-ages').innerHTML = ps.length ? `Steam data: ${ps.map((p) => `<span class="age age-${ageClass(p.fetchedAt)}"><i style="background:${p.color}"></i>${esc(pname(p))} ${ago(p.fetchedAt)}</span>`).join(' ')}` : '';
 
     $('#pool-summary').innerHTML = `${summary}${shown.length !== matching.length ? ` · showing ${shown.length}` : ''}`;
     $('#pool-grid').innerHTML = hint + (shown.map((it) => {
       const owners = poolOwners(it);
       const dots = it.ach && ps.length > 1 ? `<span class="who">${ps.map((p) => `<i style="${owners.includes(p) ? `background:${p.color}` : ''}" title="${esc(pname(p))}: ${owners.includes(p) ? 'unlocked' : 'locked'}"></i>`).join('')}</span>` : '';
       const tag = !it.ach ? '<span class="pool-tag">starts unlocked</span>' : '';
-      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}${it.ach ? '' : '\nAvailable from the start'}\nClick to open in the Spindown calculator">
+      const how = it.ach ? `Unlocked by Steam achievement #${it.ach}${markForAch(it.ach) ? ` (${markForAch(it.ach)})` : ''}` : 'Available from the start';
+      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}\n${esc(how)}\nClick to open in the Spindown calculator">
         <span class="pool-top"><span class="iid">#${it.id}</span>${qualityStars(it.quality)}</span>
         <span class="pool-name">${esc(it.name)}</span>
         <span class="pool-bottom">${tag}${dots}</span>
@@ -910,6 +1032,7 @@
     const btn = e.target.closest('[data-act]');
     if (!btn || btn.dataset.act === 'color') return;
     const i = +btn.closest('.player').dataset.i;
+    if (btn.dataset.act === 'error') openError(i);
     if (btn.dataset.act === 'remove') {
       const gone = state.players.splice(i, 1)[0];
       if (gone.unlocked) rememberPlayer(gone);
@@ -918,6 +1041,8 @@
     }
     if (btn.dataset.act === 'reload') loadPlayer(state.players[i]);
   });
+  $('#refresh-all').addEventListener('click', refreshAll);
+  $('#stale-refresh').addEventListener('click', refreshAll);
   $('#players').addEventListener('input', (e) => {
     if (e.target.dataset.act !== 'color') return;
     const p = state.players[+e.target.closest('.player').dataset.i];
@@ -1002,6 +1127,8 @@
   $$('dialog').forEach((d) => d.addEventListener('click', (e) => {
     const r = d.getBoundingClientRect();
     const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    const retry = e.target.closest('[data-retry]');
+    if (retry) { d.close(); const p = state.players[+retry.dataset.retry]; if (p) loadPlayer(p); return; }
     if (outside || e.target.closest('.u-close, [data-close]')) d.close();
   }));
 
@@ -1055,6 +1182,40 @@
     showView('marks');
   });
 
+  $('#share-btn').addEventListener('click', async () => {
+    writeUrl();
+    try {
+      await navigator.clipboard.writeText(location.href);
+      showToast('🔗 Link copied: it opens this page with the same players.', 'ok');
+    } catch (e) {
+      prompt('Copy this link:', location.href);
+    }
+  });
+
+  // ---------- keyboard shortcuts ----------
+  // ? help · 1–5 views · ←/→ characters (Marks) · / search (Spindown, Items) · Home back to top
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
+    if (e.target.closest && e.target.closest('input, select, textarea, [contenteditable]')) return;
+    if (e.key === '?') { e.preventDefault(); $('#intro').showModal(); return; }
+    if (/^[1-5]$/.test(e.key)) { showView(VIEWS[+e.key - 1]); return; }
+    if (e.key === '/') {
+      e.preventDefault();
+      if (state.view !== 'pool' && state.view !== 'spindown') showView('spindown');
+      $(state.view === 'pool' ? '#pool-search' : '#spin-input').focus();
+      return;
+    }
+    if (state.view === 'marks' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.target.closest('#carousel')) {
+      e.preventDefault();
+      step(e.key === 'ArrowRight' ? 1 : -1);
+    }
+  });
+
+  // ---------- back to top on long sheets ----------
+  const toTop = $('#to-top');
+  window.addEventListener('scroll', () => { toTop.hidden = window.scrollY < 700; }, { passive: true });
+  toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
   // ---------- start ----------
   load();
   readUrl();
@@ -1062,7 +1223,9 @@
   [...loaded()].reverse().forEach(rememberPlayer);
   renderPlayers();
   showView(state.view, false);
-  state.players.filter((p) => !p.unlocked || p.status === 'stale').forEach(loadPlayer);
+  // Players with no data, or data older than a few hours, reload from Steam (all at once).
+  state.players.filter((p) => !p.unlocked || p.status === 'stale' || !p.fetchedAt || Date.now() - p.fetchedAt > AUTO_REFRESH_AFTER)
+    .forEach((p) => loadPlayer(p, !!p.unlocked));
   let introSeen = false;
   try { introSeen = !!localStorage.getItem(INTRO_KEY); } catch (e) { /* storage blocked: show it */ }
   if (!introSeen) $('#intro').showModal();

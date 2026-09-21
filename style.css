@@ -414,7 +414,7 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 .how li { margin: 2px 0; }
 .pros, .cons { margin: 2px 0 0; padding-left: 16px; font-size: 14px; line-height: 1.2; }
 .pros li::marker { content: "+ "; color: #2f8f4e; }
-.cons li::marker { content: "â’ "; color: var(--blood); }
+.cons li::marker { content: "− "; color: var(--blood); }
 
 /* ---------- spindown ---------- */
 .estimate { margin: 8px 0 14px; padding: 8px 12px; border: 2.5px dashed var(--blood); border-radius: 8px; background: rgba(156, 28, 23, .07); line-height: 1.25; }
@@ -691,7 +691,7 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 @media (max-width: 760px) { .recent-add, .recent-forget { min-height: 40px; } }
 
 /* ---------- item pool (beta) ---------- */
-.beta-sup { font-size: 11px; color: #f2c94c; vertical-align: super; }
+.beta-sup { font-size: 11px; font-family: var(--font-body); color: #f2c94c; vertical-align: super; }
 .beta-tag { font-size: 16px; padding: 0 8px; border-radius: 6px; background: #f2c94c; border: 2px solid var(--ink); vertical-align: middle; }
 .pool-summary { margin: 12px 0 8px; color: var(--ink-soft); }
 .pool-summary b { color: var(--ink); }
@@ -767,4 +767,67 @@ button.slot:focus-visible { outline: 3px solid #c9372c; }
 
 .foot-credit { display: block; margin-top: 6px; font-size: 12px; line-height: 1.35; opacity: .75; }
 
+/* ---------- data age, refresh, stale warning ---------- */
+.player .age { font-size: 12px; font-family: var(--font-body); line-height: 1.2; }
+.age-fresh { color: #2f7a43; }
+.age-old { color: #8a6412; }
+.age-stale { color: var(--blood); font-weight: 600; }
+.player .status.err { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-family: var(--font-body); font-size: 13px; }
+.player .status.err u { text-underline-offset: 2px; }
+.player .status.err:hover { color: #c9372c; }
+.btn.ghost { background: transparent; color: var(--paper); border-color: var(--paper-dark); box-shadow: none; font-size: 17px; }
+.btn.ghost:hover:not(:disabled) { background: rgba(232,219,193,.12); }
+.btn.ghost[hidden] { display: none; }
+.stale-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  margin: 0 clamp(16px, 4vw, 40px) 12px; padding: 8px 12px;
+  background: var(--paper-noise), #f1dea0;
+  border: 3px solid #8a6412; border-radius: 10px 6px 12px 8px;
+  box-shadow: 3px 3px 0 rgba(0,0,0,.45);
+  line-height: 1.3;
+}
+.stale-banner[hidden] { display: none; }
+.stale-banner .btn { padding: 2px 12px; }
+.recent-label small { font-size: 12px; opacity: .8; font-family: var(--font-body); }
+.recent-age { font-size: 11px; opacity: .75; font-family: var(--font-body); white-space: nowrap; }
+.recent-item.old { border-style: dashed; }
+.recent-item.old .recent-age { color: #ffb09a; opacity: 1; }
+.u-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.share-btn { font-size: 15px; }
 
+/* ---------- squad: win-chance breakdown ---------- */
+.why-table { border-collapse: collapse; margin: 6px 0 4px; font-size: 14px; width: 100%; max-width: 640px; }
+.why-table th, .why-table td { padding: 2px 8px 2px 0; text-align: left; vertical-align: baseline; }
+.why-table thead th { font-family: var(--font-body); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); font-weight: 400; }
+.why-table tbody th, .why-table tfoot th { font-family: var(--font-heading); font-weight: 400; font-size: 17px; white-space: nowrap; }
+.why-table .v, .why-table .pts { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.why-table .v small { color: var(--ink-soft); }
+.why-table .pts { color: #2f7a43; }
+.why-table .pts.neg { color: var(--blood); }
+.why-table .how { color: var(--ink-soft); }
+.why-table .how a { color: inherit; }
+.why-table tfoot { border-top: 2px solid var(--ink); }
+.why-note { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.why-wrap summary { color: var(--ink); text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* ---------- challenges / spindown / pool help ---------- */
+.tab .n { font-family: var(--font-body); font-size: 13px; opacity: .7; }
+.tab .n:empty { display: none; }
+.spin-help { flex-basis: 100%; margin: -4px 0 0; font-size: 14px; line-height: 1.3; color: var(--ink-soft); }
+.spin-help b { color: var(--ink); }
+.pool-ages { margin: -4px 0 10px; font-size: 13px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.pool-ages:empty { display: none; }
+.pool-ages i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink); margin-right: 4px; }
+kbd { font-family: var(--font-body); font-size: 12px; padding: 0 5px; border: 1.5px solid var(--ink-soft); border-bottom-width: 3px; border-radius: 4px; background: rgba(255,255,255,.4); }
+
+/* ---------- back to top ---------- */
+.to-top {
+  position: fixed; right: 16px; bottom: 16px; z-index: 900;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--paper-noise), var(--paper); color: var(--ink);
+  border: 3px solid var(--ink); box-shadow: 3px 3px 0 rgba(0,0,0,.5);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.to-top[hidden] { display: none; }
+.to-top:hover { background: var(--paper-noise), #f1dea0; }
+@media (max-width: 760px) { .btn.ghost { width: 100%; min-height: 44px; } }

@@ -18,16 +18,22 @@
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
       <button class="view-btn" data-view="spindown">Spindown</button>
-      <button class="view-btn" data-view="pool">Items <sup class="beta-sup">beta</sup></button>
-      <button class="help-btn" id="help-btn" aria-label="How to use this site" title="How to use this site">?</button>
+      <button class="view-btn" data-view="pool" title="Estimated from Steam achievements">Items <sup class="beta-sup">estimate</sup></button>
+      <button class="help-btn" id="help-btn" aria-label="How to use this site" title="How to use this site (?)">?</button>
+      <button class="help-btn share-btn" id="share-btn" aria-label="Copy a link to this page" title="Copy a link to this page with these players">🔗</button>
     </nav>
     <div class="players" id="players"></div>
+    <button class="btn ghost" id="refresh-all" hidden title="Reload every player from Steam">↻ Refresh all</button>
     <form class="add-player" id="add-form" autocomplete="off">
       <input id="add-input" type="text" placeholder="steamcommunity.com/id/NAME or 76561198…" title="Paste a Steam profile link (steamcommunity.com/id/… or /profiles/…) or a 17-digit Steam ID. The profile and its game details must be public." aria-label="Steam profile link or Steam ID">
       <button type="submit" class="btn">+ Add player</button>
     </form>
     <div class="recent" id="recent" hidden></div>
   </header>
+  <div class="stale-banner" id="stale-banner" role="status" hidden>
+    <span>⚠ <span id="stale-banner-text"></span></span>
+    <button class="btn" id="stale-refresh">↻ Refresh</button>
+  </div>
 
   <div class="view" id="view-marks">
     <section class="select">
@@ -57,15 +63,16 @@
       <div class="sheet-head">
         <h2>Challenges</h2>
         <div class="tabs" id="chal-filter">
-          <button class="tab" data-f="all">All</button>
-          <button class="tab" data-f="ready" title="Everyone has it unlocked and someone still needs to beat it">Ready for co-op</button>
-          <button class="tab" data-f="todo">Someone needs it</button>
-          <button class="tab" data-f="locked">Locked for someone</button>
+          <button class="tab" data-f="all" title="Every challenge">All <span class="n"></span></button>
+          <button class="tab" data-f="ready" title="Everyone in the lobby can play it, and at least one person still needs to beat it. Best picks for a co-op session.">Ready for co-op <span class="n"></span></button>
+          <button class="tab" data-f="todo" title="At least one person hasn't beaten it yet (it may still be locked for someone)">Someone needs it <span class="n"></span></button>
+          <button class="tab" data-f="locked" title="At least one person can't play it yet: they need to unlock it first">Locked for someone <span class="n"></span></button>
         </div>
       </div>
       <p class="sheet-sub">
         <span class="chip-demo lock">🔒</span> locked &nbsp; <span class="chip-demo open"></span> unlocked, not beaten &nbsp; <span class="chip-demo done">✓</span> beaten.
         In co-op every player plays the challenge's character.
+        <b>Ready for co-op</b> = everyone can play it and someone still needs to beat it.
       </p>
       <div id="chal-list" class="chal-grid"></div>
     </section>
@@ -117,6 +124,7 @@
         <label class="spin-field">Unlocks from
           <select id="spin-source"></select>
         </label>
+        <p class="spin-help" id="spin-source-help"></p>
         <label class="check dark"><input type="checkbox" id="spin-all"> Ignore unlocks (every item counts)</label>
         <label class="spin-field">Uses
           <select id="spin-steps"><option>5</option><option>10</option><option>20</option></select>
@@ -132,9 +140,9 @@
 
   <div class="view" id="view-pool" hidden>
     <section class="sheet">
-      <div class="sheet-head"><h2>Item pool <span class="beta-tag">beta</span></h2></div>
+      <div class="sheet-head"><h2>Item pool <span class="beta-tag">estimate</span></h2></div>
       <p class="spin-intro"><b>Which items can show up for your lobby?</b> Every item you have unlocked, combined across players (union) or per save. Click an item to open it in the Spindown calculator.</p>
-      <p class="estimate"><b>Beta, this is an estimate and may not work right.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run follows one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to.</p>
+      <p class="estimate"><b>⚠ This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to. Hover an item to see which achievement unlocks it.</p>
       <div class="spin-controls">
         <label class="spin-field">Show
           <select id="pool-mode"></select>
@@ -150,6 +158,7 @@
         <input id="pool-search" type="search" placeholder="Filter by name, ID or effect" aria-label="Filter items" autocomplete="off">
       </div>
       <p class="pool-summary" id="pool-summary"></p>
+      <p class="pool-ages" id="pool-ages"></p>
       <div class="pool-grid" id="pool-grid"></div>
     </section>
   </div>
@@ -162,9 +171,10 @@
       <li>
         <b>Add players.</b> Paste a Steam profile link or Steam ID in the box at the top and press <em>+ Add player</em> (up to 4).
         The profile and its <em>game details</em> must be public on Steam. Click a player's color circle to change their color.
+        "updated … ago" shows how old each player's data is; press <em>↻</em> or <em>Refresh all</em> after you play.
       </li>
       <li>
-        <b>Share.</b> The page address holds the player list, so just send the link to your friends.
+        <b>Share.</b> The page address holds the players and the page you're on. Press <em>🔗</em> to copy it and send it to your friends.
       </li>
     </ol>
     <div class="tour">
@@ -172,8 +182,9 @@
       <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
       <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
       <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
-      <button data-go="pool"><b>Items (beta)</b><span>Every item your lobby has unlocked, combined or per player. An estimate that may not always be right.</span></button>
+      <button data-go="pool"><b>Items (estimate)</b><span>Every item your lobby has unlocked, combined or per player. Guessed from Steam achievements, so it can differ from your save.</span></button>
     </div>
+    <p class="intro-foot"><b>Keys:</b> <kbd>1</kbd>–<kbd>5</kbd> switch pages · <kbd>←</kbd> <kbd>→</kbd> characters · <kbd>/</kbd> item search · <kbd>?</kbd> this help.</p>
     <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.
       Reopen this anytime with the <b>?</b> button.</p>
     <button class="btn intro-ok" data-close>Got it</button>
@@ -183,6 +194,8 @@
     <button class="u-close" aria-label="Close" autofocus>✕</button>
     <div id="unlock-body"></div>
   </dialog>
+
+  <button class="to-top" id="to-top" hidden aria-label="Back to top" title="Back to top">↑</button>
 
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
