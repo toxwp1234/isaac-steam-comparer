@@ -88,6 +88,15 @@
   defs.innerHTML = '<defs></defs>';
   document.body.prepend(defs);
 
+  // Colour of a glyph nobody has yet, and of one Steam can't track.
+  const EMPTY = 'rgba(60,40,25,.12)', UNKNOWN = 'rgba(60,40,25,.06)';
+  const sprite = (rects) => {
+    const url = URL.createObjectURL(new Blob(
+      [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${N} ${N}" shape-rendering="crispEdges">${rects}</svg>`],
+      { type: 'image/svg+xml' }));
+    return `<image href="${url}" width="${N}" height="${N}"/>`;
+  };
+
   function tileArt(variant, col) {
     const id = `${variant}-${col}`;
     let got = cache.get(id);
@@ -107,10 +116,15 @@
       if (solid) shell = shell.concat(halo(mask, solid.c));
     }
 
+    // The sprite and the empty glyph are each drawn once into a small SVG image (a blob URL) and
+    // every mark on the page shows that image: a table of hundreds of marks stays cheap, where
+    // hundreds of inline rects or <use> clones take the browser a long time to lay out.
+    // Only the player colours stay live, poured through the clip path below.
     got = {
       clip: `mkc-${id}`,
-      art: shell.map((r) => rect(r, v.pal[DIGITS.indexOf(r.c)])).join(''),
-      core: body.map((r) => rect(r, 'currentColor')).join(''),
+      art: sprite(shell.map((r) => rect(r, v.pal[DIGITS.indexOf(r.c)])).join('')),
+      empty: sprite(body.map((r) => rect(r, EMPTY)).join('')),
+      unknown: sprite(body.map((r) => rect(r, UNKNOWN)).join('')),
     };
     defs.querySelector('defs').insertAdjacentHTML('beforeend',
       `<clipPath id="${got.clip}" clipPathUnits="userSpaceOnUse">` +
@@ -138,7 +152,7 @@
     const done = fills.length > 0;
     const body = done
       ? fills.map((f, i) => `<path d="${wedge(i, fills.length)}" fill="${f.color}"/>`).join('')
-      : `<g class="${state === 'unknown' ? 'mk-unknown' : 'mk-empty'}">${t.core}</g>`;
+      : (state === 'unknown' ? t.unknown : t.empty);
     return `<svg viewBox="0 0 ${N} ${N}" class="mark-svg ${state}${done ? ' done' : ''}" ` +
       `shape-rendering="crispEdges">` +
       `<g class="mk-ink">${t.art}</g>` +

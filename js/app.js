@@ -30,6 +30,7 @@
     coopSort: false,
     hard: true,
     chalFilter: 'all',
+    boss: 'mother', bossMode: 'boss', bossFilter: 'all', bossHideDone: false,
     squad: { goals: {}, dupes: false },
     spin: { source: 'union', all: false, steps: 10, item: null },
     pool: { mode: 'union', q: '', minQ: 0, sort: 'id' },
@@ -40,7 +41,8 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         view: state.view, selected: state.selected, filter: state.filter, coopSort: state.coopSort, hard: state.hard,
-        chalFilter: state.chalFilter, squad: state.squad, spin: state.spin, pool: state.pool,
+        chalFilter: state.chalFilter, boss: state.boss, bossMode: state.bossMode, bossFilter: state.bossFilter, bossHideDone: state.bossHideDone,
+        squad: state.squad, spin: state.spin, pool: state.pool,
         players: state.players.map((p) => ({
           input: p.input, path: p.path, sid: p.sid, color: p.color, name: p.name, avatar: p.avatar,
           unlocked: p.unlocked ? [...p.unlocked] : null, fetchedAt: p.fetchedAt,
@@ -50,17 +52,18 @@
     writeUrl();
   }
 
-  // ---------- shareable link: ?p1=<steamID64 or custom URL name>&p2=…&view=marks&char=isaac ----------
-  const VIEWS = ['marks', 'challenges', 'squad', 'spindown', 'pool'];
+  // ---------- shareable link: ?p1=<steamID64 or custom URL name>&p2=…&view=marks&char=isaac (or view=bosses&boss=mother|all) ----------
+  const VIEWS = ['marks', 'bosses', 'challenges', 'squad', 'spindown', 'pool'];
   const urlId = (p) => p.sid || (p.path.startsWith('profiles/') ? p.path.slice(9) : p.path.slice(3));
 
   function writeUrl() {
     const q = new URLSearchParams(location.search);
     for (let i = 1; i <= MAX_PLAYERS; i++) q.delete(`p${i}`);
-    q.delete('view'); q.delete('char');
+    q.delete('view'); q.delete('char'); q.delete('boss');
     state.players.forEach((p, i) => q.set(`p${i + 1}`, urlId(p)));
     q.set('view', state.view);
     if (state.view === 'marks') q.set('char', state.selected);
+    if (state.view === 'bosses') q.set('boss', state.bossMode === 'table' ? 'all' : state.boss);
     const search = q.toString();
     const url = `${location.pathname}${search ? `?${search}` : ''}${location.hash}`;
     if (url !== `${location.pathname}${location.search}${location.hash}`) history.replaceState(null, '', url);
@@ -70,6 +73,9 @@
   function readUrl() {
     const q = new URLSearchParams(location.search);
     if (VIEWS.includes(q.get('view'))) state.view = q.get('view');
+    const boss = q.get('boss');
+    if (boss === 'all') state.bossMode = 'table';
+    else if (MARKS.some((m) => m.key === boss)) { state.boss = boss; state.bossMode = 'boss'; }
     if (charById[q.get('char')]) {
       state.selected = q.get('char');
       if (state.filter !== 'all' && (state.filter === 'tainted') !== charById[state.selected].tainted) state.filter = 'all';
@@ -98,7 +104,9 @@
       if (!d) return;
       Object.assign(state, {
         view: d.view || 'marks', selected: d.selected || 'isaac', filter: d.filter || 'all', coopSort: !!d.coopSort,
-        hard: d.hard !== false, chalFilter: d.chalFilter || 'all', squad: { goals: {}, dupes: false, ...(d.squad || {}) },
+        hard: d.hard !== false, chalFilter: d.chalFilter || 'all',
+        boss: d.boss || 'mother', bossMode: d.bossMode === 'table' ? 'table' : 'boss', bossFilter: d.bossFilter || 'all', bossHideDone: !!d.bossHideDone,
+        squad: { goals: {}, dupes: false, ...(d.squad || {}) },
         spin: { ...state.spin, ...(d.spin || {}) },
         pool: { ...state.pool, ...(d.pool || {}) },
       });
@@ -270,23 +278,44 @@
   function markIds(ch, mark) {
     return (mark.ids || [mark.key]).map((k) => ch.ach[k]).filter(Boolean);
   }
-  // 'done' | 'none' | 'unknown'
+  // Marks that share one achievement on this character, or null. Tainted characters get one
+  // achievement for Isaac + ??? + Satan + The Lamb and one for Boss Rush + Hush, and Steam only
+  // hands it out once all of them are done.
+  const groupCache = new Map();
+  function markGroup(ch, mark) {
+    const k = `${ch.id}/${mark.key}`;
+    if (!groupCache.has(k)) {
+      const ids = markIds(ch, mark);
+      const keys = ids.length === 1
+        ? MARKS.filter((m) => { const o = markIds(ch, m); return o.length === 1 && o[0] === ids[0]; }).map((m) => m.key) : [];
+      groupCache.set(k, keys.length > 1 ? keys : null);
+    }
+    return groupCache.get(k);
+  }
+  const groupText = (keys) => keys.map((k) => MARKS.find((m) => m.key === k).label).join(' + ');
+
+  // 'done' | 'none' | 'maybe' | 'unknown'
+  // maybe = a shared achievement is still locked, so any of its marks may or may not be done.
   function markState(ch, mark, p) {
     const ids = markIds(ch, mark);
     if (!ids.length) return 'unknown';
     if (!p || !p.unlocked) return 'none';
-    return ids.some((id) => p.unlocked.has(id)) ? 'done' : 'none';
+    if (ids.some((id) => p.unlocked.has(id))) return 'done';
+    return markGroup(ch, mark) ? 'maybe' : 'none';
   }
+  const notDone = (s) => s === 'none' || s === 'maybe';
 
+  // missing counts 'maybe' marks too: they are only sure once the shared achievement pops.
   function score(ch, p) {
-    let done = 0, total = 0;
+    let done = 0, total = 0, maybe = 0;
     for (const m of MARKS) {
       const s = markState(ch, m, p);
       if (s === 'unknown') continue;
       total++;
       if (s === 'done') done++;
+      if (s === 'maybe') maybe++;
     }
-    return { done, total, missing: total - done };
+    return { done, total, maybe, missing: total - done };
   }
 
   const coopMissing = (ch) => loaded().reduce((sum, p) => sum + score(ch, p).missing, 0);
@@ -422,14 +451,16 @@
       ${statBars(r)}
       <ul class="tally">${tally}</ul>`;
 
-    let unknownSeen = false;
+    let unknownSeen = false, maybeSeen = false;
     const slots = MARKS.map((m) => {
       const unknown = markState(ch, m, null) === 'unknown';
       if (unknown) unknownSeen = true;
       const per = ps.map((p) => ({ p, s: markState(ch, m, p) }));
       const have = unknown ? [] : per.filter((x) => x.s === 'done');
-      const missing = unknown ? [] : per.filter((x) => x.s === 'none');
-      const miss = missing.map((x) => `<span class="dot-missing" style="--pc:${x.p.color}" title="${esc(pname(x.p))} is missing this"></span>`).join('');
+      const missing = unknown ? [] : per.filter((x) => notDone(x.s));
+      const maybe = missing.filter((x) => x.s === 'maybe');
+      if (maybe.length) maybeSeen = true;
+      const miss = missing.map((x) => `<span class="dot-missing${x.s === 'maybe' ? ' maybe' : ''}" style="--pc:${x.p.color}" title="${esc(pname(x.p))} ${x.s === 'maybe' ? 'may be missing this' : 'is missing this'}"></span>`).join('');
       // The Greed slot carries its own difficulty: Greedier is the hard tier of Greed mode, so
       // it is drawn as a hard mark once everyone holding it got there through Greedier.
       const hardId = m.hardKey && ch.ach[m.hardKey];
@@ -440,11 +471,14 @@
         : !ps.length ? `${m.label} — click to see what it unlocks`
         : have.length === ps.length ? `${m.label} — everyone has it ✓`
         : have.length ? `${m.label} — ${have.length}/${ps.length} have it · missing: ${missing.map((x) => pname(x.p)).join(', ')}`
+        : maybe.length ? `${m.label} — not confirmed by Steam yet`
         : `${m.label} — nobody has it yet`;
+      const group = markGroup(ch, m);
+      const shared = maybe.length ? ` · Steam only reports ${groupText(group)} together, so ${maybe.map((x) => pname(x.p)).join(', ')} may have this one already` : '';
       const greedTier = m.hardKey && have.length
         ? ` · ${onHard ? 'beaten on Greedier' : 'Greed only - nobody has Greedier yet'}` : '';
       const sel = state.selectedMark === m.key ? ' sel' : '';
-      return `<button class="slot${unknown ? ' unknown' : ''}${sel}" data-mark="${m.key}" data-tip="${esc(tip + greedTier)}" aria-label="${esc(tip + greedTier)}. Click to see what it unlocks.">
+      return `<button class="slot${unknown ? ' unknown' : ''}${sel}" data-mark="${m.key}" data-tip="${esc(tip + greedTier + shared)}" aria-label="${esc(tip + greedTier + shared)}. Click to see what it unlocks.">
         ${markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', onHard)}${unknown ? '<span class="q">?</span>' : ''}
         <span class="lbl">${esc(m.label)}</span><span class="miss">${miss}</span></button>`;
     }).join('');
@@ -455,6 +489,7 @@
       '<span>click a mark to see what it unlocks</span>',
       ps.length ? '<span>● under a mark = still missing for that player</span>' : '',
       unknownSeen ? '<span>? = not tracked by Steam for tainted characters</span>' : '',
+      maybeSeen ? '<span>◌ dashed dot = maybe missing: Steam reports these bosses only all together</span>' : '',
     ].join('');
     $('#note').innerHTML = `${hint}<div class="note-grid">${slots}</div><div class="legend">${legend}</div>`;
   }
@@ -473,8 +508,8 @@
   const STEAM_ICON = 'https://shared.akamai.steamstatic.com/community_assets/images/apps/250900/';
   const TAINTED_SHARED = { isaac: 'Isaac, ???, Satan and The Lamb', bluebaby: 'Isaac, ???, Satan and The Lamb', satan: 'Isaac, ???, Satan and The Lamb', lamb: 'Isaac, ???, Satan and The Lamb', bossrush: 'Boss Rush and Hush', hush: 'Boss Rush and Hush' };
 
-  function openUnlock(markKey) {
-    const ch = charById[state.selected];
+  function openUnlock(markKey, chId = state.selected) {
+    const ch = charById[chId];
     const m = MARKS.find((x) => x.key === markKey);
     const ids = markIds(ch, m);
     let html;
@@ -504,6 +539,178 @@
     }
     $('#unlock-body').innerHTML = html;
     $('#unlock').showModal();
+  }
+
+  // ---------- rendering: bosses view (which characters beat each boss) ----------
+  // One cell = one character × one boss, for every loaded player.
+  function bossCell(ch, m, ps) {
+    const unknown = markState(ch, m, null) === 'unknown';
+    const per = ps.map((p) => ({ p, s: unknown ? 'unknown' : markState(ch, m, p), lock: !hasChar(p, ch) }));
+    const have = per.filter((x) => x.s === 'done');
+    const hardId = m.hardKey && ch.ach[m.hardKey];
+    const hard = m.hardKey ? have.length > 0 && have.every((x) => hardId && x.p.unlocked.has(hardId)) : state.hard;
+    const svg = markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', hard);
+    const line = (x) => {
+      const greed = m.hardKey && x.s === 'done' ? (hardId && x.p.unlocked.has(hardId) ? ' (Greedier)' : ' (Greed only)') : '';
+      const what = x.s === 'done' ? `done${greed}` : x.s === 'maybe' ? 'maybe (see below)'
+        : x.lock ? 'character not unlocked yet' : 'not done';
+      return `${pname(x.p)}: ${what}`;
+    };
+    const group = markGroup(ch, m);
+    const tip = [`${m.label} on ${ch.name}`,
+      ...(unknown ? ['Steam has no achievement for this mark on tainted characters'] : per.map(line)),
+      ...(group && per.some((x) => x.s === 'maybe') ? [`Steam unlocks ${groupText(group)} as one achievement, only once all are done, so this one may already be done.`] : []),
+    ].join('\n');
+    const todo = per.filter((x) => notDone(x.s));
+    return { ch, m, unknown, per, have, todo, svg, tip,
+      everyone: ps.length > 0 && have.length === ps.length,
+      ready: todo.length > 0 && per.every((x) => !x.lock) };
+  }
+
+  // A boss as a plain, readable icon (not a player's mark): the hard sprite filled in a neutral ink.
+  const bossIcon = (m) => markSvg(m.icon, [{ color: '#9b7b5f' }], 'known', true);
+
+  const BOSS_FILTERS = {
+    all: { label: 'All', tip: 'Every character', test: () => true },
+    todo: { label: 'Someone needs it', tip: 'At least one player has not beaten this boss with the character yet', test: (c) => c.todo.length > 0 },
+    ready: { label: 'Ready for co-op', tip: 'Everyone has the character unlocked and someone still needs this boss on it', test: (c) => c.ready },
+    done: { label: 'Everyone has it', tip: 'Every player has this mark on the character', test: (c) => c.everyone },
+  };
+
+  // Per-player "done / total" for one boss over all characters Steam tracks it for.
+  function bossTally(m, p) {
+    let done = 0, total = 0, maybe = 0;
+    for (const ch of CHARACTERS) {
+      const s = markState(ch, m, p);
+      if (s === 'unknown') continue;
+      total++;
+      if (s === 'done') done++;
+      if (s === 'maybe') maybe++;
+    }
+    return { done, total, maybe };
+  }
+
+  function renderBossPicker(ps) {
+    $('#boss-picker').innerHTML = MARKS.map((m) => {
+      const pips = ps.map((p) => {
+        const t = bossTally(m, p);
+        return `<div class="pip" title="${esc(pname(p))}: ${t.done}/${t.total}"><i style="width:${t.total ? (100 * t.done) / t.total : 0}%;background:${p.color}"></i></div>`;
+      }).join('');
+      const sel = state.bossMode === 'boss' && state.boss === m.key;
+      return `<button class="bpick${sel ? ' sel' : ''}" data-boss="${m.key}" aria-pressed="${sel}" title="${esc(m.label)}: which characters have beaten it">
+        ${bossIcon(m)}<span class="lbl">${esc(m.label)}</span><span class="pips">${pips}</span></button>`;
+    }).join('');
+  }
+
+  function renderBosses() {
+    const ps = loaded();
+    if (!MARKS.some((m) => m.key === state.boss)) state.boss = 'mother';
+    $$('#boss-mode .tab').forEach((t) => t.setAttribute('aria-selected', t.dataset.mode === state.bossMode));
+    renderBossPicker(ps);
+    // On phones the picker is a scrolling strip: keep the picked boss in view.
+    const box = $('#boss-picker'), sel = box.querySelector('.bpick.sel');
+    if (sel && box.scrollWidth > box.clientWidth) box.scrollLeft = sel.offsetLeft - (box.clientWidth - sel.offsetWidth) / 2;
+    const hint = !state.players.length ? '<p class="empty-hint light">Add a player above to see who beat each boss with which character.</p>'
+      : !ps.length ? '<p class="empty-hint light">Loading achievements…</p>' : '';
+    $('#boss-body').innerHTML = hint + (state.bossMode === 'table' ? bossTable(ps) : bossOne(ps));
+  }
+
+  const pdot = (cls, color) => `<span class="pdot ${cls}" style="--pc:${color}">${cls === 'lock' ? ico('lock') : cls === 'maybe' ? '?' : ''}</span>`;
+
+  function bossOne(ps) {
+    const m = MARKS.find((x) => x.key === state.boss);
+    const cells = CHARACTERS.map((ch) => bossCell(ch, m, ps));
+    const tracked = cells.filter((c) => !c.unknown);
+    const f = BOSS_FILTERS[state.bossFilter] ? state.bossFilter : 'all';
+    const tabs = Object.entries(BOSS_FILTERS).map(([k, x]) =>
+      `<button class="tab" data-bf="${k}" aria-selected="${k === f}" title="${esc(x.tip)}">${esc(x.label)} <span class="n">${tracked.filter(x.test).length}</span></button>`).join('');
+
+    const tallies = ps.map((p) => {
+      const t = bossTally(m, p);
+      const tip = `${pname(p)} beat ${m.label} with ${t.done} of ${t.total} characters${t.maybe ? `. ${t.maybe} more may be done: Steam reports some tainted marks only as a group` : ''}`;
+      return `<span class="btally" title="${esc(tip)}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>
+        <span class="progress-bar"><span class="progress-fill" style="--progress:${t.total ? (100 * t.done) / t.total : 0}%;--pc:${p.color}"></span></span>
+        <b>${t.done}/${t.total}</b>${t.maybe ? `<small>+${t.maybe} maybe</small>` : ''}</span>`;
+    }).join('');
+    const everyone = tracked.filter((c) => c.everyone).length;
+    const nobody = tracked.filter((c) => !c.have.length).length;
+    const ready = tracked.filter((c) => c.ready).length;
+
+    const card = (c) => {
+      const dots = c.per.map((x) => pdot(c.unknown ? 'unknown' : x.s === 'done' ? 'done' : x.s === 'maybe' ? 'maybe' : x.lock ? 'lock' : 'open', x.p.color)).join('');
+      const cls = c.unknown ? ' unknown' : c.everyone ? ' all' : '';
+      return `<button class="bcard${c.ch.tainted ? ' tainted' : ''}${cls}" data-char="${c.ch.id}" data-mark="${m.key}" title="${esc(c.tip)}&#10;Click for this mark's unlock.">
+        ${c.everyone ? '<span class="cstar" aria-hidden="true">★</span>' : ''}${portraitSvg(c.ch.portrait, c.ch.tainted)}<span class="bname">${esc(c.ch.name)}</span>
+        <span class="bmark">${c.svg}${c.per.some((x) => x.s === 'maybe') ? '<span class="q">?</span>' : ''}</span>
+        ${dots ? `<span class="pdots">${dots}</span>` : ''}</button>`;
+    };
+    const section = (title, list, note) => {
+      if (note && list.every((c) => c.unknown)) return `<h3 class="sheet-h3 bsec">${title}</h3><p class="bnote">${note}</p>`;
+      const shown = f === 'all' ? list : list.filter((c) => !c.unknown && BOSS_FILTERS[f].test(c));
+      const body = shown.length ? `<div class="bgrid">${shown.map(card).join('')}</div>`
+        : `<p class="bnote">No characters here for “${esc(BOSS_FILTERS[f].label)}”.</p>`;
+      return `<h3 class="sheet-h3 bsec">${title}</h3>${body}`;
+    };
+    const groupCh = CHARACTERS.find((ch) => ch.tainted && markGroup(ch, m));
+    const notes = [
+      groupCh ? `<p class="bnote small">${ico('warn')}<span>Tainted characters: Steam unlocks <b>${esc(groupText(markGroup(groupCh, m)))}</b> as one achievement, only once all of them are done. Until then the mark shows <b>?</b>: it may already be done.</span></p>` : '',
+      m.hardKey ? `<p class="bnote small">${ico('warn')}<span>Greedier also counts as Greed. The mark is drawn in its hard style when everyone who has it beat Greedier. Tainted characters only report Greedier.</span></p>` : '',
+    ].join('');
+
+    return `<div class="bhead">
+        <div class="bhead-mark">${bossIcon(m)}</div>
+        <div class="bhead-info">
+          <h3>${esc(m.label)}</h3>
+          ${ps.length ? `<p class="bsum">${everyone} of ${tracked.length} characters done by everyone · ${nobody} by nobody${ready ? ` · <b>${ready} ready for co-op</b>` : ''}</p>` : ''}
+          <div class="btallies">${tallies}</div>
+        </div>
+      </div>
+      ${ps.length ? `<div class="tabs bfilter" role="tablist">${tabs}</div>` : ''}
+      ${notes}
+      ${section('Characters', cells.filter((c) => !c.ch.tainted))}
+      ${section('Tainted characters', cells.filter((c) => c.ch.tainted), m.key === 'heart' ? "Steam has no achievement for Mom's Heart on tainted characters, so the site can't tell who has it." : null)}
+      ${ps.length ? `<p class="legend bleg"><span>${pdot('done', '#6b5a4a')} done</span><span>${pdot('open', '#6b5a4a')} not done</span><span>${pdot('maybe', '#6b5a4a')} maybe (tainted group)</span><span>${pdot('lock', '#6b5a4a')} character locked</span><span>★ everyone has it</span><span>←/→ next boss</span></p>` : ''}`;
+  }
+
+  function bossTable(ps) {
+    const chars = CHARACTERS.filter((ch) => !state.bossHideDone || !ps.length || ps.some((p) => score(ch, p).missing > 0));
+    const head = MARKS.map((m) => `<th scope="col"><button class="bt-head" data-boss="${m.key}" title="${esc(m.label)}: open this boss">${bossIcon(m)}<span>${esc(m.label)}</span></button></th>`).join('');
+    let prevTainted = false, rows = '';
+    for (const ch of chars) {
+      if (ch.tainted && !prevTainted) rows += `<tr class="bt-div"><th colspan="${MARKS.length + 2}">Tainted characters</th></tr>`;
+      prevTainted = ch.tainted;
+      const cells = MARKS.map((m) => {
+        const c = bossCell(ch, m, ps);
+        const q = c.per.some((x) => x.s === 'maybe');
+        return `<td class="bt-cell${c.unknown ? ' unknown' : c.everyone ? ' all' : ''}"><button data-char="${ch.id}" data-mark="${m.key}" title="${esc(c.tip)}">${c.svg}${q ? '<span class="q">?</span>' : ''}</button></td>`;
+      }).join('');
+      const sc = ps.map((p) => {
+        const s = score(ch, p), lock = !hasChar(p, ch);
+        return `<span class="bt-sc${lock ? ' lock' : ''}${s.done === s.total ? ' full' : ''}" style="--pc:${p.color}" title="${esc(pname(p))}: ${s.done}/${s.total} marks${lock ? ' · character locked' : ''}">${s.done}</span>`;
+      }).join('');
+      rows += `<tr class="${ch.tainted ? 'tainted' : ''}"><th scope="row"><button class="bt-char" data-goto="${ch.id}" title="Open ${esc(ch.name)} on the Marks page">${portraitSvg(ch.portrait, ch.tainted)}<span>${esc(ch.name)}</span></button></th>${cells}<td class="bt-scores">${sc}</td></tr>`;
+    }
+    const foot = ps.length ? `<tr class="bt-foot"><th scope="row">Characters</th>${MARKS.map((m) => `<td>${ps.map((p) => {
+      const t = bossTally(m, p);
+      return `<span class="bt-sc${t.done === t.total ? ' full' : ''}" style="--pc:${p.color}" title="${esc(pname(p))}: ${esc(m.label)} with ${t.done}/${t.total} characters">${t.done}</span>`;
+    }).join('')}</td>`).join('')}<td></td></tr>` : '';
+    return `<div class="bt-bar">
+        <label class="check dark"><input type="checkbox" id="boss-hide-done"${state.bossHideDone ? ' checked' : ''}> Hide characters everyone finished</label>
+        <span class="bt-help">Click a mark for its unlock, a boss for its page, a character for the Marks page. <b>?</b> = maybe done (tainted group). Faded = Steam does not track it.</span>
+      </div>
+      <div class="bt-wrap"><table class="btable">
+        <thead><tr><th class="bt-corner"></th>${head}<th class="bt-scores" title="Marks per player on this character">Marks</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="${MARKS.length + 2}" class="bnote">Everyone finished every character.</td></tr>`}</tbody>
+        <tfoot>${foot}</tfoot>
+      </table></div>`;
+  }
+
+  function stepBoss(dir) {
+    const i = MARKS.findIndex((m) => m.key === state.boss);
+    state.boss = MARKS[(i + dir + MARKS.length) % MARKS.length].key;
+    state.bossMode = 'boss';
+    save();
+    renderBosses();
   }
 
   // ---------- rendering: challenges view ----------
@@ -592,7 +799,7 @@
 
   // Marks this player still needs on this character along a route.
   function routeGain(c, p, route) {
-    const need = (keys) => keys.filter((k) => markState(c, markByKey[k], p) === 'none');
+    const need = (keys) => keys.filter((k) => notDone(markState(c, markByKey[k], p)));
     const core = need(route.core), bonus = need(route.bonus);
     return { core, bonus, value: core.length + BONUS_WEIGHT * bonus.length };
   }
@@ -939,6 +1146,7 @@
   // ---------- views ----------
   function renderView() {
     if (state.view === 'marks') { renderCarousel(); renderStage(); }
+    if (state.view === 'bosses') renderBosses();
     if (state.view === 'challenges') renderChallenges();
     if (state.view === 'squad') renderSquad();
     if (state.view === 'spindown') renderSpindown();
@@ -1146,6 +1354,39 @@
     if (go.dataset.go === 'marks' && !state.players.length) $('#add-input').focus();
   });
 
+  $('#view-bosses').addEventListener('click', (e) => {
+    const mode = e.target.closest('#boss-mode [data-mode]');
+    if (mode) { state.bossMode = mode.dataset.mode; save(); renderBosses(); return; }
+    const pick = e.target.closest('[data-boss]');
+    if (pick) { state.boss = pick.dataset.boss; state.bossMode = 'boss'; save(); renderBosses(); return; }
+    const bf = e.target.closest('[data-bf]');
+    if (bf) { state.bossFilter = bf.dataset.bf; save(); renderBosses(); return; }
+    const go = e.target.closest('[data-goto]');
+    if (go) {
+      state.selected = go.dataset.goto;
+      if (!visibleChars().some((c) => c.id === state.selected)) state.filter = 'all';
+      showView('marks');
+      return;
+    }
+    const cell = e.target.closest('[data-char][data-mark]');
+    if (cell) openUnlock(cell.dataset.mark, cell.dataset.char);
+  });
+  $('#view-bosses').addEventListener('change', (e) => {
+    if (e.target.id !== 'boss-hide-done') return;
+    state.bossHideDone = e.target.checked;
+    save();
+    renderBosses();
+  });
+  // Swipe left/right on the boss page for the next/previous boss.
+  let bossTouch = null;
+  $('#boss-body').addEventListener('touchstart', (e) => { bossTouch = [e.changedTouches[0].clientX, e.changedTouches[0].clientY]; }, { passive: true });
+  $('#boss-body').addEventListener('touchend', (e) => {
+    if (!bossTouch || state.bossMode !== 'boss') return;
+    const dx = e.changedTouches[0].clientX - bossTouch[0], dy = e.changedTouches[0].clientY - bossTouch[1];
+    bossTouch = null;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > 1.5 * Math.abs(dy)) stepBoss(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
   $('#chal-filter').addEventListener('click', (e) => {
     const t = e.target.closest('.tab');
     if (!t) return;
@@ -1195,12 +1436,12 @@
   });
 
   // ---------- keyboard shortcuts ----------
-  // ? help · 1–5 views · ←/→ characters (Marks) · / search (Spindown, Items) · Home back to top
+  // ? help · 1–6 views · ←/→ characters (Marks) or bosses (Bosses) · / search (Spindown, Items) · Home back to top
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
     if (e.target.closest && e.target.closest('input, select, textarea, [contenteditable]')) return;
     if (e.key === '?') { e.preventDefault(); $('#intro').showModal(); return; }
-    if (/^[1-5]$/.test(e.key)) { showView(VIEWS[+e.key - 1]); return; }
+    if (/^[1-6]$/.test(e.key)) { showView(VIEWS[+e.key - 1]); return; }
     if (e.key === '/') {
       e.preventDefault();
       if (state.view !== 'pool' && state.view !== 'spindown') showView('spindown');
@@ -1210,6 +1451,10 @@
     if (state.view === 'marks' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.target.closest('#carousel')) {
       e.preventDefault();
       step(e.key === 'ArrowRight' ? 1 : -1);
+    }
+    if (state.view === 'bosses' && state.bossMode === 'boss' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      stepBoss(e.key === 'ArrowRight' ? 1 : -1);
     }
   });
 

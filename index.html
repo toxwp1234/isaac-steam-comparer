@@ -34,6 +34,7 @@
     <h1 class="title">Co-op <span>Marks</span></h1>
     <nav class="views" aria-label="Views">
       <button class="view-btn" data-view="marks">Marks</button>
+      <button class="view-btn" data-view="bosses" title="Which characters beat each boss">Bosses</button>
       <button class="view-btn" data-view="challenges">Challenges</button>
       <button class="view-btn" data-view="squad">Squad</button>
       <button class="view-btn" data-view="spindown">Spindown</button>
@@ -78,6 +79,21 @@
       <div class="char-card" id="char-card"></div>
       <div class="note" id="note"></div>
     </main>
+  </div>
+
+  <div class="view" id="view-bosses" hidden>
+    <section class="sheet wide">
+      <div class="sheet-head">
+        <h2>Bosses</h2>
+        <div class="tabs" id="boss-mode" role="tablist">
+          <button class="tab" data-mode="boss" role="tab" title="One boss: every character that has or still needs it">By boss</button>
+          <button class="tab" data-mode="table" role="tab" title="Every boss on every character in one table">All at once</button>
+        </div>
+      </div>
+      <p class="sheet-sub">Which characters has each player beaten a boss with? Pick a boss to see who still needs it, or open the table to see everything at once.</p>
+      <div class="boss-picker" id="boss-picker"></div>
+      <div id="boss-body"></div>
+    </section>
   </div>
 
   <div class="view" id="view-challenges" hidden>
@@ -201,12 +217,13 @@
     </ol>
     <div class="tour">
       <button data-go="marks"><b>Marks</b><span>Pick a character. Each mark is colored by who has it, split when several players do. A dot under a mark = still missing. Click a mark to see what it unlocks.</span></button>
+      <button data-go="bosses"><b>Bosses</b><span>Pick a boss and see which characters each player has beaten it with, and which still need it. "All at once" shows every boss on every character.</span></button>
       <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
       <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
       <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
       <button data-go="pool"><b>Items (estimate)</b><span>Every item your lobby has unlocked, combined or per player. Guessed from Steam achievements, so it can differ from your save.</span></button>
     </div>
-    <p class="intro-foot"><b>Keys:</b> <kbd>1</kbd>–<kbd>5</kbd> switch pages · <kbd>←</kbd> <kbd>→</kbd> characters · <kbd>/</kbd> item search · <kbd>?</kbd> this help.</p>
+    <p class="intro-foot"><b>Keys:</b> <kbd>1</kbd>–<kbd>6</kbd> switch pages · <kbd>←</kbd> <kbd>→</kbd> characters or bosses · <kbd>/</kbd> item search · <kbd>?</kbd> this help.</p>
     <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.
       Reopen this anytime with the <b>?</b> button.</p>
     <button class="btn intro-ok" data-close>Got it</button>
