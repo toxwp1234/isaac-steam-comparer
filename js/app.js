@@ -33,7 +33,7 @@
     boss: 'mother', bossMode: 'boss', bossFilter: 'all', bossHideDone: false,
     squad: { goals: {}, dupes: false },
     spin: { source: 'union', all: false, steps: 10, item: null },
-    pool: { mode: 'union', q: '', minQ: 0, sort: 'id' },
+    pool: { mode: 'everyone', q: '', minQ: 0, sort: 'id' },
   };
 
   // ---------- persistence ----------
@@ -1097,9 +1097,11 @@
 
   function renderPool() {
     const ps = loaded();
-    const modes = [['union', 'Unlocked by anyone (union)'], ['everyone', 'Unlocked by everyone'],
-      ...ps.map((p) => [p.path, `${pname(p)}'s save`]), ['locked', 'Locked for everyone']];
-    if (!modes.some(([v]) => v === state.pool.mode)) state.pool.mode = 'union';
+    // 'everyone' (default) = items all of us have (intersection); 'any' = items at least one of us has.
+    const many = ps.length > 1;
+    const modes = [['everyone', many ? 'Unlocked by all of us (shared)' : 'Unlocked'], ...(many ? [['any', 'Unlocked by anyone']] : []),
+      ...(many ? ps.map((p) => [p.path, `${pname(p)}'s save`]) : []), ['locked', 'Locked']];
+    if (!modes.some(([v]) => v === state.pool.mode)) state.pool.mode = 'everyone';
     $('#pool-mode').innerHTML = modes.map(([v, l]) => `<option value="${esc(v)}"${v === state.pool.mode ? ' selected' : ''}>${esc(l)}</option>`).join('');
     $('#pool-quality').value = String(state.pool.minQ);
     $('#pool-sort').value = state.pool.sort;
@@ -1109,7 +1111,7 @@
     const inMode = (it) => {
       const owners = poolOwners(it);
       switch (state.pool.mode) {
-        case 'union': return !it.ach || owners.length > 0;
+        case 'any': return !it.ach || owners.length > 0;
         case 'everyone': return !it.ach || (ps.length > 0 && owners.length === ps.length);
         case 'locked': return !!it.ach && owners.length === 0;
         default: return !it.ach || owners.some((p) => p.path === state.pool.mode);
@@ -1134,13 +1136,42 @@
       const owners = poolOwners(it);
       const dots = it.ach && ps.length > 1 ? `<span class="who">${ps.map((p) => `<i style="${owners.includes(p) ? `background:${p.color}` : ''}" title="${esc(pname(p))}: ${owners.includes(p) ? 'unlocked' : 'locked'}"></i>`).join('')}</span>` : '';
       const tag = !it.ach ? '<span class="pool-tag">starts unlocked</span>' : '';
-      const how = it.ach ? `Unlocked by Steam achievement #${it.ach}${markForAch(it.ach) ? ` (${markForAch(it.ach)})` : ''}` : 'Available from the start';
-      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}\n${esc(how)}\nClick to open in the Spindown calculator">
+      const how = it.ach ? `Unlock: ${achUnlock(it.ach)}` : 'Available from the start';
+      return `<button class="pool-item q${it.quality}${state.pool.mode === 'locked' ? ' locked' : ''}" data-item="${it.id}" title="${esc(it.desc)}\n${esc(how)}\nClick for how to unlock it">
         <span class="pool-top"><span class="iid">#${it.id}</span>${qualityStars(it.quality)}</span>
         <span class="pool-name">${esc(it.name)}</span>
         <span class="pool-bottom">${tag}${dots}</span>
       </button>`;
     }).join('') || '<p class="empty-hint light">No items match.</p>');
+  }
+
+  // How to earn the achievement behind an item, in words.
+  const achUnlock = (id) => (ACHIEVEMENTS[id] ? ACHIEVEMENTS[id][1] : markForAch(id)) || `Steam achievement #${id}`;
+
+  function openItem(id) {
+    const it = itemById.get(id);
+    const ps = loaded();
+    const owners = poolOwners(it);
+    const a = it.ach && ACHIEVEMENTS[it.ach];
+    const who = it.ach ? ps.map((p) => {
+      const has = owners.includes(p);
+      return `<span class="chip ${has ? 'done' : 'open'}" style="--pc:${p.color}">${has ? ico('check') : ''}<em>${esc(pname(p))}</em></span>`;
+    }).join('') : '';
+    const missing = ps.filter((p) => !owners.includes(p));
+    const status = !it.ach ? '<p class="u-note ok">Available from the start: no unlock needed.</p>'
+      : !ps.length ? ''
+      : !missing.length ? `<p class="u-note ok">${ps.length > 1 ? 'All of you have' : 'You have'} it unlocked.</p>`
+      : !owners.length ? `<p class="u-note">${ps.length > 1 ? 'Nobody has' : 'You don’t have'} it unlocked yet.</p>`
+      : `<p class="u-note">Still locked for ${esc(missing.map(pname).join(', '))}.</p>`;
+    $('#unlock-body').innerHTML = `<p class="u-kind">Item #${it.id} · ${qualityStars(it.quality)}</p><h3>${esc(it.name)}</h3>
+      ${it.quote ? `<p class="u-quote">“${esc(it.quote)}”</p>` : ''}
+      <p>${esc(it.desc)}</p>
+      ${it.ach ? `<div class="u-how"><p class="u-kind">How to unlock${a ? ` · achievement “${esc(a[0])}”` : ''}</p><p class="u-cond">${esc(achUnlock(it.ach))}</p></div>` : ''}
+      ${status}
+      ${who ? `<div class="chips u-who">${who}</div>` : ''}
+      <p class="u-links"><a class="u-wiki" href="https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(it.name.replace(/ /g, '_'))}" target="_blank" rel="noopener">Open on the wiki ↗</a>
+        <button type="button" class="u-spin" data-spin="${it.id}">Open in Spindown →</button></p>`;
+    $('#unlock').showModal();
   }
 
   // ---------- views ----------
@@ -1316,8 +1347,13 @@
   });
   $('#pool-grid').addEventListener('click', (e) => {
     const b = e.target.closest('[data-item]');
+    if (b) openItem(+b.dataset.item);
+  });
+  $('#unlock-body').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-spin]');
     if (!b) return;
-    state.spin.item = +b.dataset.item;
+    $('#unlock').close();
+    state.spin.item = +b.dataset.spin;
     showView('spindown');
   });
   $('#spin-source').addEventListener('change', (e) => { state.spin.source = e.target.value; save(); renderSpindown(); });

@@ -1043,3 +1043,9 @@ kbd { font-family: var(--font-body); font-size: 12px; padding: 0 5px; border: 1.
   .bt-head span { display: none; }
   .bt-help { display: none; }
 }
+.u-how { margin: 12px 0 4px; padding: 8px 10px; border: 2px dashed var(--ink-soft); border-radius: 8px; }
+.u-cond { font-size: 19px; margin: 2px 0 0 !important; }
+.u-note.ok { color: var(--ink-soft); }
+.u-links { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.u-spin { font: inherit; font-size: 15px; padding: 2px 10px; border: 2px solid var(--ink); border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
+.u-spin:hover { background: var(--ink); color: var(--paper); }

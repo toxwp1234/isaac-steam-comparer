@@ -179,8 +179,8 @@
   <div class="view" id="view-pool" hidden>
     <section class="sheet">
       <div class="sheet-head"><h2>Item pool <span class="beta-tag">estimate</span></h2></div>
-      <p class="spin-intro"><b>Which items can show up for your lobby?</b> Every item you have unlocked, combined across players (union) or per save. Click an item to open it in the Spindown calculator.</p>
-      <p class="estimate"><b>This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to. Hover an item to see which achievement unlocks it.</p>
+      <p class="spin-intro"><b>Which items can show up for your lobby?</b> By default only items <i>all of you</i> have unlocked (shared). Switch to anyone, one save, or locked. Click an item to see how to unlock it.</p>
+      <p class="estimate"><b>This is an estimate.</b> Unlocks are guessed from Steam achievements, so your save can differ (for example after a save reset or an Alt+F2 sync). A co-op run uses one save file, most likely the host's. This list doesn't know which room pool (Treasure, Shop, Devil…) an item belongs to.</p>
       <div class="spin-controls">
         <label class="spin-field">Show
           <select id="pool-mode"></select>
@@ -221,7 +221,7 @@
       <button data-go="challenges"><b>Challenges</b><span>Who has each challenge locked, unlocked or beaten. "Ready for co-op" = everyone can play it and someone still needs it.</span></button>
       <button data-go="squad"><b>Squad</b><span>Choose what each player wants (Auto, Carry or a character to hunt) and get the best character picks for the lobby.</span></button>
       <button data-go="spindown"><b>Spindown</b><span>Search the item on the pedestal to see what Spindown Dice turns it into. Estimated from Steam unlocks.</span></button>
-      <button data-go="pool"><b>Items (estimate)</b><span>Every item your lobby has unlocked, combined or per player. Guessed from Steam achievements, so it can differ from your save.</span></button>
+      <button data-go="pool"><b>Items (estimate)</b><span>Items your whole lobby has unlocked (shared), or per player. Click one for how to unlock it. Guessed from Steam achievements, so it can differ from your save.</span></button>
     </div>
     <p class="intro-foot"><b>Keys:</b> <kbd>1</kbd>–<kbd>6</kbd> switch pages · <kbd>←</kbd> <kbd>→</kbd> characters or bosses · <kbd>/</kbd> item search · <kbd>?</kbd> this help.</p>
     <p class="intro-foot">Everything comes from public Steam achievements, so some things (hard mode, a few tainted marks, save resets) are best guesses.
@@ -248,6 +248,7 @@
   <script src="js/challenges.js"></script>
   <script src="js/unlocks.js"></script>
   <script src="js/items.js"></script>
+  <script src="js/achievements.js"></script>
   <script src="js/coop.js"></script>
   <script src="js/marks-art.js"></script>
   <script src="js/portraits-art.js"></script>
