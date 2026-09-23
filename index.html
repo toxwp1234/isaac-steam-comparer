@@ -61,6 +61,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.6l4.6 4.6L19 7.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8"/></symbol>
   </svg>
   <header class="top">
+    <div class="top-bar">
     <h1 class="title">Co-op <span>Marks</span></h1>
     <nav class="views" aria-label="Views">
       <button class="view-btn" data-view="marks">Marks</button>
@@ -72,7 +73,9 @@
       <button class="icon-btn" id="help-btn" aria-label="How to use this site" title="How to use this site (?)"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
       <button class="icon-btn" id="share-btn" aria-label="Copy a link to this page" title="Copy a link to this page with these players"><svg class="ico" aria-hidden="true"><use href="#i-link"/></svg></button>
     </nav>
+    </div>
     <div class="players" id="players"></div>
+    <div class="lobby-side">
     <button class="btn ghost" id="refresh-all" hidden title="Reload every player from Steam"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg><span>Refresh all</span></button>
     <form class="add-player" id="add-form" autocomplete="off">
       <label class="add-field">
@@ -82,6 +85,7 @@
       <button type="submit" class="btn"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg><span>Add player</span></button>
     </form>
     <div class="recent" id="recent" hidden></div>
+    </div>
   </header>
   <div class="stale-banner" id="stale-banner" role="status" hidden>
     <span class="stale-text"><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><span id="stale-banner-text"></span></span>
