@@ -475,7 +475,7 @@
       const missing = unknown ? [] : per.filter((x) => notDone(x.s));
       const maybe = missing.filter((x) => x.s === 'maybe');
       if (maybe.length) maybeSeen = true;
-      const miss = missing.map((x) => `<span class="dot-missing${x.s === 'maybe' ? ' maybe' : ''}" style="--pc:${x.p.color}" title="${esc(pname(x.p))} ${x.s === 'maybe' ? 'may be missing this' : 'is missing this'}"></span>`).join('');
+      const miss = missing.map((x) => `<span class="dot-missing${x.s === 'maybe' ? ' maybe' : ''}" style="--pc:${x.p.color}" title="${esc(pname(x.p))}${x.s === 'maybe' ? ': ?' : ' is missing this'}"></span>`).join('');
       // The Greed slot carries its own difficulty: Greedier is the hard tier of Greed mode, so
       // it is drawn as a hard mark once everyone holding it got there through Greedier.
       const hardId = m.hardKey && ch.ach[m.hardKey];
@@ -503,7 +503,7 @@
       '<span>click a mark to see what it unlocks</span>',
       ps.length ? '<span>● under a mark = still missing for that player</span>' : '',
       unknownSeen ? '<span>? = not tracked by Steam for tainted characters</span>' : '',
-      maybeSeen ? '<span>◌ dashed dot = maybe missing: Steam cannot confirm this mark (hover it for why)</span>' : '',
+      maybeSeen ? '<span>◌ dashed dot = ? Steam cannot confirm this mark (hover it for why)</span>' : '',
     ].join('');
     $('#note').innerHTML = `${hint}<div class="note-grid">${slots}</div><div class="legend">${legend}</div>`;
   }
@@ -544,7 +544,7 @@
           const has = p.unlocked && p.unlocked.has(id);
           const st = ids.length > 1 ? (has ? (ALT_UNLOCKS[id] ? 'maybe' : 'done') : 'open')
             : ({ done: 'done', maybe: 'maybe' })[markState(ch, m, p)] || 'open';
-          return `<span class="chip ${st}" style="--pc:${p.color}" title="${esc(pname(p))}: ${st === 'done' ? 'done' : st === 'maybe' ? 'maybe - Steam cannot tell' : 'not done'}">${st === 'done' ? ico('check') : st === 'maybe' ? '?' : ''}<em>${esc(pname(p))}</em></span>`;
+          return `<span class="chip ${st}" style="--pc:${p.color}" title="${esc(pname(p))}: ${st === 'done' ? 'done' : st === 'maybe' ? '?' : 'not done'}">${st === 'done' ? ico('check') : st === 'maybe' ? '?' : ''}<em>${esc(pname(p))}</em></span>`;
         }).join('');
         return `<div class="u-head">
           ${u.i ? `<img src="${STEAM_ICON}${esc(u.i)}" alt="" width="64" height="64" referrerpolicy="no-referrer">` : ''}
@@ -573,7 +573,7 @@
     const svg = markSvg(m.icon, have.map((x) => ({ color: x.p.color })), unknown ? 'unknown' : 'known', hard);
     const line = (x) => {
       const greed = m.hardKey && x.s === 'done' ? (hardId && x.p.unlocked.has(hardId) ? ' (Greedier)' : ' (Greed only)') : '';
-      const what = x.s === 'done' ? `done${greed}` : x.s === 'maybe' ? 'maybe (see below)'
+      const what = x.s === 'done' ? `done${greed}` : x.s === 'maybe' ? '? (see below)'
         : x.lock ? 'character not unlocked yet' : 'not done';
       return `${pname(x.p)}: ${what}`;
     };
@@ -650,7 +650,7 @@
       const tip = `${pname(p)} beat ${m.label} with ${t.done} of ${t.total} characters${t.maybe ? `. ${t.maybe} more Steam can't confirm either way (the ? marks)` : ''}`;
       return `<span class="btally" title="${esc(tip)}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>
         <span class="progress-bar"><span class="progress-fill" style="--progress:${t.total ? (100 * t.done) / t.total : 0}%;--pc:${p.color}"></span></span>
-        <b>${t.done}/${t.total}</b>${t.maybe ? `<small>+${t.maybe} maybe</small>` : ''}</span>`;
+        <b>${t.done}/${t.total}</b>${t.maybe ? `<small>+${t.maybe} ?</small>` : ''}</span>`;
     }).join('');
     const everyone = tracked.filter((c) => c.everyone).length;
     const nobody = tracked.filter((c) => !c.have.length).length;
@@ -690,7 +690,7 @@
       ${notes}
       ${section('Characters', cells.filter((c) => !c.ch.tainted))}
       ${section('Tainted characters', cells.filter((c) => c.ch.tainted), m.key === 'heart' ? "Steam has no achievement for Mom's Heart on tainted characters, so the site can't tell who has it." : null)}
-      ${ps.length ? `<p class="legend bleg"><span>${pdot('done', '#6b5a4a')} done</span><span>${pdot('open', '#6b5a4a')} not done</span><span>${pdot('maybe', '#6b5a4a')} maybe (Steam can't tell)</span><span>${pdot('lock', '#6b5a4a')} character locked</span><span>★ everyone has it</span><span>←/→ next boss</span></p>` : ''}`;
+      ${ps.length ? `<p class="legend bleg"><span>${pdot('done', '#6b5a4a')} done</span><span>${pdot('open', '#6b5a4a')} not done</span><span>${pdot('maybe', '#6b5a4a')} Steam can't tell</span><span>${pdot('lock', '#6b5a4a')} character locked</span><span>★ everyone has it</span><span>←/→ next boss</span></p>` : ''}`;
   }
 
   function bossTable(ps) {
