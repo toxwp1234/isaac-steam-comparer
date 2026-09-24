@@ -366,6 +366,7 @@ input, select, textarea {
 .chip.open::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--pc); }
 .chip.done { background: var(--pc); color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,.5); }
 .chip.lock { border-style: dashed; opacity: .55; }
+.chip.maybe { border-style: dashed; border-color: var(--pc); font-weight: bold; }
 
 .squad-controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
 .goal { display: flex; align-items: center; gap: 6px; }

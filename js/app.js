@@ -209,8 +209,8 @@
   // "Hush on Isaac" for a completion-mark achievement, null for any other achievement.
   function markForAch(id) {
     for (const ch of CHARACTERS) {
-      const m = MARKS.find((x) => ch.ach[x.key] === id);
-      if (m) return `${m.label} on ${ch.name}`;
+      const ms = MARKS.filter((x) => ch.ach[x.key] === id);
+      if (ms.length) return `${ms.map((m) => m.label).join(' + ')} on ${ch.name}${ALT_UNLOCKS[id] ? ` (or ${ALT_UNLOCKS[id]})` : ''}`;
     }
     return null;
   }
@@ -294,14 +294,29 @@
   }
   const groupText = (keys) => keys.map((k) => MARKS.find((m) => m.key === k).label).join(' + ');
 
+  // Achievements a player can also get without the mark, so having them doesn't prove it.
+  // The Left Hand (Judas beats ???) also pops for killing Ultra Pride.
+  const ALT_UNLOCKS = { 77: 'killing Ultra Pride' };
+  const markAlts = (ch, mark) => markIds(ch, mark).filter((id) => ALT_UNLOCKS[id]);
+
   // 'done' | 'none' | 'maybe' | 'unknown'
-  // maybe = a shared achievement is still locked, so any of its marks may or may not be done.
+  // maybe = Steam can't settle it: a shared achievement is still locked (any of its marks may
+  // be done), or the achievement is unlocked but could have come from somewhere else.
   function markState(ch, mark, p) {
     const ids = markIds(ch, mark);
     if (!ids.length) return 'unknown';
     if (!p || !p.unlocked) return 'none';
-    if (ids.some((id) => p.unlocked.has(id))) return 'done';
+    const got = ids.filter((id) => p.unlocked.has(id));
+    if (got.length) return got.every((id) => ALT_UNLOCKS[id]) ? 'maybe' : 'done';
     return markGroup(ch, mark) ? 'maybe' : 'none';
+  }
+  // Why a mark can show as maybe, in words (null if it never can).
+  function maybeWhy(ch, mark) {
+    const group = markGroup(ch, mark);
+    if (group) return `Steam only reports ${groupText(group)} together, once all of them are done`;
+    const alts = markAlts(ch, mark);
+    if (alts.length) return `${alts.map((id) => (UNLOCKS[id] || {}).n || `achievement #${id}`).join(', ')} also unlocks by ${alts.map((id) => ALT_UNLOCKS[id]).join(', ')}, so having it doesn't prove this mark`;
+    return null;
   }
   const notDone = (s) => s === 'none' || s === 'maybe';
 
@@ -473,8 +488,7 @@
         : have.length ? `${m.label} — ${have.length}/${ps.length} have it · missing: ${missing.map((x) => pname(x.p)).join(', ')}`
         : maybe.length ? `${m.label} — not confirmed by Steam yet`
         : `${m.label} — nobody has it yet`;
-      const group = markGroup(ch, m);
-      const shared = maybe.length ? ` · Steam only reports ${groupText(group)} together, so ${maybe.map((x) => pname(x.p)).join(', ')} may have this one already` : '';
+      const shared = maybe.length ? ` · ${maybe.map((x) => pname(x.p)).join(', ')}: maybe. ${maybeWhy(ch, m)}` : '';
       const greedTier = m.hardKey && have.length
         ? ` · ${onHard ? 'beaten on Greedier' : 'Greed only - nobody has Greedier yet'}` : '';
       const sel = state.selectedMark === m.key ? ' sel' : '';
@@ -489,7 +503,7 @@
       '<span>click a mark to see what it unlocks</span>',
       ps.length ? '<span>● under a mark = still missing for that player</span>' : '',
       unknownSeen ? '<span>? = not tracked by Steam for tainted characters</span>' : '',
-      maybeSeen ? '<span>◌ dashed dot = maybe missing: Steam reports these bosses only all together</span>' : '',
+      maybeSeen ? '<span>◌ dashed dot = maybe missing: Steam cannot confirm this mark (hover it for why)</span>' : '',
     ].join('');
     $('#note').innerHTML = `${hint}<div class="note-grid">${slots}</div><div class="legend">${legend}</div>`;
   }
@@ -527,8 +541,10 @@
       const card = (id, label) => {
         const u = UNLOCKS[id] || { n: 'Unknown unlock', k: '', d: '' };
         const who = ps.map((p) => {
-          const done = ids.length > 1 ? !!(p.unlocked && p.unlocked.has(id)) : markState(ch, m, p) === 'done';
-          return `<span class="chip ${done ? 'done' : 'open'}" style="--pc:${p.color}">${done ? ico('check') : ''}<em>${esc(pname(p))}</em></span>`;
+          const has = p.unlocked && p.unlocked.has(id);
+          const st = ids.length > 1 ? (has ? (ALT_UNLOCKS[id] ? 'maybe' : 'done') : 'open')
+            : ({ done: 'done', maybe: 'maybe' })[markState(ch, m, p)] || 'open';
+          return `<span class="chip ${st}" style="--pc:${p.color}" title="${esc(pname(p))}: ${st === 'done' ? 'done' : st === 'maybe' ? 'maybe - Steam cannot tell' : 'not done'}">${st === 'done' ? ico('check') : st === 'maybe' ? '?' : ''}<em>${esc(pname(p))}</em></span>`;
         }).join('');
         return `<div class="u-head">
           ${u.i ? `<img src="${STEAM_ICON}${esc(u.i)}" alt="" width="64" height="64" referrerpolicy="no-referrer">` : ''}
@@ -536,6 +552,7 @@
         </div>
         ${u.q ? `<p class="u-quote">“${esc(u.q)}”</p>` : ''}
         <p>${esc(u.d)}</p>
+        ${ALT_UNLOCKS[id] ? `<p class="u-note">${esc(u.n)} has two ways to unlock: this mark, or ${esc(ALT_UNLOCKS[id])}. Steam can't tell which one a player did, so owning it only shows as <b>?</b> (maybe).</p>` : ''}
         ${who ? `<div class="chips u-who">${who}</div>` : ''}
         ${u.w ? `<a class="u-wiki" href="https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(u.w.replace(/ /g, '_'))}" target="_blank" rel="noopener">Open on the wiki ↗</a>` : ''}`;
       };
@@ -560,10 +577,9 @@
         : x.lock ? 'character not unlocked yet' : 'not done';
       return `${pname(x.p)}: ${what}`;
     };
-    const group = markGroup(ch, m);
     const tip = [`${m.label} on ${ch.name}`,
       ...(unknown ? ['Steam has no achievement for this mark on tainted characters'] : per.map(line)),
-      ...(group && per.some((x) => x.s === 'maybe') ? [`Steam unlocks ${groupText(group)} as one achievement, only once all are done, so this one may already be done.`] : []),
+      ...(per.some((x) => x.s === 'maybe') ? [`${maybeWhy(ch, m)}.`] : []),
     ].join('\n');
     const todo = per.filter((x) => notDone(x.s));
     return { ch, m, unknown, per, have, todo, svg, tip,
@@ -631,7 +647,7 @@
 
     const tallies = ps.map((p) => {
       const t = bossTally(m, p);
-      const tip = `${pname(p)} beat ${m.label} with ${t.done} of ${t.total} characters${t.maybe ? `. ${t.maybe} more may be done: Steam reports some tainted marks only as a group` : ''}`;
+      const tip = `${pname(p)} beat ${m.label} with ${t.done} of ${t.total} characters${t.maybe ? `. ${t.maybe} more Steam can't confirm either way (the ? marks)` : ''}`;
       return `<span class="btally" title="${esc(tip)}"><span class="dot" style="background:${p.color}"></span><span class="nm">${esc(pname(p))}</span>
         <span class="progress-bar"><span class="progress-fill" style="--progress:${t.total ? (100 * t.done) / t.total : 0}%;--pc:${p.color}"></span></span>
         <b>${t.done}/${t.total}</b>${t.maybe ? `<small>+${t.maybe} maybe</small>` : ''}</span>`;
@@ -658,6 +674,7 @@
     const groupCh = CHARACTERS.find((ch) => ch.tainted && markGroup(ch, m));
     const notes = [
       groupCh ? `<p class="bnote small">${ico('warn')}<span>Tainted characters: Steam unlocks <b>${esc(groupText(markGroup(groupCh, m)))}</b> as one achievement, only once all of them are done. Until then the mark shows <b>?</b>: it may already be done.</span></p>` : '',
+      ...CHARACTERS.filter((ch) => !markGroup(ch, m) && markAlts(ch, m).length).map((ch) => `<p class="bnote small">${ico('warn')}<span>${esc(ch.name)}: ${esc(maybeWhy(ch, m))}. A player who has it shows <b>?</b> here.</span></p>`),
       m.hardKey ? `<p class="bnote small">${ico('warn')}<span>Greedier also counts as Greed. The mark is drawn in its hard style when everyone who has it beat Greedier. Tainted characters only report Greedier.</span></p>` : '',
     ].join('');
 
@@ -673,7 +690,7 @@
       ${notes}
       ${section('Characters', cells.filter((c) => !c.ch.tainted))}
       ${section('Tainted characters', cells.filter((c) => c.ch.tainted), m.key === 'heart' ? "Steam has no achievement for Mom's Heart on tainted characters, so the site can't tell who has it." : null)}
-      ${ps.length ? `<p class="legend bleg"><span>${pdot('done', '#6b5a4a')} done</span><span>${pdot('open', '#6b5a4a')} not done</span><span>${pdot('maybe', '#6b5a4a')} maybe (tainted group)</span><span>${pdot('lock', '#6b5a4a')} character locked</span><span>★ everyone has it</span><span>←/→ next boss</span></p>` : ''}`;
+      ${ps.length ? `<p class="legend bleg"><span>${pdot('done', '#6b5a4a')} done</span><span>${pdot('open', '#6b5a4a')} not done</span><span>${pdot('maybe', '#6b5a4a')} maybe (Steam can't tell)</span><span>${pdot('lock', '#6b5a4a')} character locked</span><span>★ everyone has it</span><span>←/→ next boss</span></p>` : ''}`;
   }
 
   function bossTable(ps) {
@@ -700,7 +717,7 @@
     }).join('')}</td>`).join('')}<td></td></tr>` : '';
     return `<div class="bt-bar">
         <label class="check dark"><input type="checkbox" id="boss-hide-done"${state.bossHideDone ? ' checked' : ''}> Hide characters everyone finished</label>
-        <span class="bt-help">Click a mark for its unlock, a boss for its page, a character for the Marks page. <b>?</b> = maybe done (tainted group). Faded = Steam does not track it.</span>
+        <span class="bt-help">Click a mark for its unlock, a boss for its page, a character for the Marks page. <b>?</b> = Steam can't tell if it's done (hover for why). Faded = Steam does not track it.</span>
       </div>
       <div class="bt-wrap"><table class="btable">
         <thead><tr><th class="bt-corner"></th>${head}<th class="bt-scores" title="Marks per player on this character">Marks</th></tr></thead>
