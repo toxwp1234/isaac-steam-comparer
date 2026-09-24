@@ -488,7 +488,7 @@
         : have.length ? `${m.label} — ${have.length}/${ps.length} have it · missing: ${missing.map((x) => pname(x.p)).join(', ')}`
         : maybe.length ? `${m.label} — not confirmed by Steam yet`
         : `${m.label} — nobody has it yet`;
-      const shared = maybe.length ? ` · ${maybe.map((x) => pname(x.p)).join(', ')}: maybe. ${maybeWhy(ch, m)}` : '';
+      const shared = maybe.length ? ` · ${maybeWhy(ch, m)}` : '';
       const greedTier = m.hardKey && have.length
         ? ` · ${onHard ? 'beaten on Greedier' : 'Greed only - nobody has Greedier yet'}` : '';
       const sel = state.selectedMark === m.key ? ' sel' : '';
@@ -552,7 +552,7 @@
         </div>
         ${u.q ? `<p class="u-quote">“${esc(u.q)}”</p>` : ''}
         <p>${esc(u.d)}</p>
-        ${ALT_UNLOCKS[id] ? `<p class="u-note">${esc(u.n)} has two ways to unlock: this mark, or ${esc(ALT_UNLOCKS[id])}. Steam can't tell which one a player did, so owning it only shows as <b>?</b> (maybe).</p>` : ''}
+        ${ALT_UNLOCKS[id] ? `<p class="u-note">${esc(u.n)} has two ways to unlock: this mark, or ${esc(ALT_UNLOCKS[id])}. Steam can't tell which one a player did, so owning it only shows as <b>?</b>.</p>` : ''}
         ${who ? `<div class="chips u-who">${who}</div>` : ''}
         ${u.w ? `<a class="u-wiki" href="https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(u.w.replace(/ /g, '_'))}" target="_blank" rel="noopener">Open on the wiki ↗</a>` : ''}`;
       };
