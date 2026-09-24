@@ -517,25 +517,29 @@
       html = `<p class="u-kind">${esc(m.label)} · ${esc(ch.name)}</p><h3>No unlock</h3>
         <p>Tainted characters get nothing for this mark, so Steam has no achievement for it and the app can't tell who has it.</p>`;
     } else {
-      // Greed slot: the Greed achievement is the unlock; Greedier only proves the mark.
-      const id = ids[0];
-      const u = UNLOCKS[id] || { n: 'Unknown unlock', k: '', d: '' };
+      // Greed slot: Greed and Greedier are separate achievements with their own unlock, so
+      // each gets its own card; the chips then say who has that achievement, not the mark.
       const ps = loaded();
-      const who = ps.map((p) => {
-        const s = markState(ch, m, p);
-        return `<span class="chip ${s === 'done' ? 'done' : 'open'}" style="--pc:${p.color}">${s === 'done' ? ico('check') : ''}<em>${esc(pname(p))}</em></span>`;
-      }).join('');
+      const labels = m.ids ? m.ids.filter((k) => ch.ach[k]).map((k) => (k === m.hardKey ? 'Ultra Greedier' : m.label)) : [m.label];
       const shared = ch.tainted && TAINTED_SHARED[m.key]
         ? `<p class="u-note">For tainted characters this one unlock needs all of: ${TAINTED_SHARED[m.key]}.</p>` : '';
       const greedNote = m.key === 'greed' && ch.tainted ? '<p class="u-note">Tainted characters only get an unlock for Greedier, which also gives the Greed mark.</p>' : '';
-      html = `<div class="u-head">
+      const card = (id, label) => {
+        const u = UNLOCKS[id] || { n: 'Unknown unlock', k: '', d: '' };
+        const who = ps.map((p) => {
+          const done = ids.length > 1 ? !!(p.unlocked && p.unlocked.has(id)) : markState(ch, m, p) === 'done';
+          return `<span class="chip ${done ? 'done' : 'open'}" style="--pc:${p.color}">${done ? ico('check') : ''}<em>${esc(pname(p))}</em></span>`;
+        }).join('');
+        return `<div class="u-head">
           ${u.i ? `<img src="${STEAM_ICON}${esc(u.i)}" alt="" width="64" height="64" referrerpolicy="no-referrer">` : ''}
-          <div><p class="u-kind">${esc(m.label)} · ${esc(ch.name)}</p><h3>${esc(u.n)}</h3>${u.k ? `<span class="u-type">${esc(u.k)}</span>` : ''}</div>
+          <div><p class="u-kind">${esc(label)} · ${esc(ch.name)}</p><h3>${esc(u.n)}</h3>${u.k ? `<span class="u-type">${esc(u.k)}</span>` : ''}</div>
         </div>
         ${u.q ? `<p class="u-quote">“${esc(u.q)}”</p>` : ''}
-        <p>${esc(u.d)}</p>${shared}${greedNote}
+        <p>${esc(u.d)}</p>
         ${who ? `<div class="chips u-who">${who}</div>` : ''}
         ${u.w ? `<a class="u-wiki" href="https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(u.w.replace(/ /g, '_'))}" target="_blank" rel="noopener">Open on the wiki ↗</a>` : ''}`;
+      };
+      html = ids.map((id, i) => card(id, labels[i] || m.label)).join('<hr class="u-sep">') + shared + greedNote;
     }
     $('#unlock-body').innerHTML = html;
     $('#unlock').showModal();
