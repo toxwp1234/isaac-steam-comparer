@@ -263,11 +263,13 @@ input, select, textarea {
 .char-card .portrait { width: 100%; height: auto; max-width: 220px; }
 .char-card h2 { margin: 4px 0 2px; font-size: 38px; line-height: 1; font-weight: 400; }
 .char-card .sub { color: var(--ink-soft); font-size: 16px; }
-.tally { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; text-align: left; }
-.tally li { display: flex; align-items: center; gap: 8px; font-size: 18px; }
-.tally .dot { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--ink); flex: none; }
-.tally .nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tally .sc { font-size: 22px; }
+.tally { list-style: none; padding: 0 6px 0 0; margin: 14px 0 0; display: grid; gap: 6px; text-align: left; }
+.tally li { display: flex; align-items: baseline; gap: 8px; font-size: 18px; line-height: 1.2; }
+.tally .dot { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--ink); flex: none; align-self: center; }
+/* long names wrap instead of getting cut off; the score and stamp never shrink */
+.tally .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tally .sc { font-size: 22px; line-height: 1; flex: none; white-space: nowrap; padding-right: 2px; }
+.tally .stamp, .tally .lock { flex: none; white-space: nowrap; align-self: center; }
 
 .note {
   position: relative;
