@@ -1,6 +1,7 @@
 // All Repentance+ collectibles from the Isaac wiki, sorted by item ID. Used by the Spindown calculator.
 // [id, name, quality 0-4, Steam achievement ID that unlocks it (null = always unlocked), quote, description, hidden?]
 // Hidden items (always skipped by Spindown Dice): 59, 656 (not listed), 714 Recall, 715 Hold.
+// Quest items (key/knife pieces, shovels, Dogma, Dad's Note…) are not hidden, so Spindown can land on them.
 window.ITEMS = [
   [1,"The Sad Onion",3,null,"Tears up","+0.7 tears."],
   [2,"The Inner Eye",3,null,"Triple shot","Isaac shoots three tears at once with lower fire rate."],
@@ -547,7 +548,8 @@ window.ITEMS = [
   [547,"Divorce Papers",3,"397","Tears up + you feel empty","Grants one Bone Heart, +0.7 tears, spawns a Mysterious Paper."],
   [548,"Jaw Bone",1,"395","Fetch!","Spawns a familiar that flies through the room while firing, dealing a flat 7 contact damage to enemies and retrieving pickups."],
   [549,"Brittle Bones",3,"396","Everything hurts","Replaces all Red Heart with 6 empty Bone Hearts. Upon losing a Bone Heart, Isaac fires bones in 8 directions and permanently gains a tears up. Upon losing a…"],
-  [550,"Broken Shovel",4,null,"It feels cursed","While held, causes Mom to continuously attempt to stomp on Isaac. Activating makes her stop for the current room or wave. One of two parts necessary to…"],
+  [550,"Broken Shovel 1",4,null,"It feels cursed","While held, causes Mom to continuously attempt to stomp on Isaac. Activating makes her stop for the current room or wave. One of two parts necessary to…"],
+  [551,"Broken Shovel 2",4,null,"It feels cursed","One of two parts necessary to create Mom's Shovel. No effect if somehow obtained on its own."],
   [552,"Mom's Shovel",4,null,"Lost but not forgotten","Creates a trapdoor that leads to the next floor. Unlocks The Forgotten when used on a mound of dirt that appears in Dark Room."],
   [553,"Mucormycosis",3,null,"Spore shot","Gives Isaac the chance to fire spore tears that stick to enemies and blow up after a few seconds, dealing damage and poisoning nearby enemies and releasing…"],
   [554,"2Spooky",1,null,"4me","Enemies near Isaac are afflicted with fear. Grants +0.5 tears and +0.2 shot speed."],

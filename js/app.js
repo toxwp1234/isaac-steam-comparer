@@ -996,6 +996,10 @@
   // that aren't unlocked on the save the run uses. Unlocks are estimated from Steam achievements.
   const itemById = new Map(ITEMS.map((r) => [r[0], { id: r[0], name: r[1], quality: r[2], ach: r[3], quote: r[4], desc: r[5], hidden: !!r[6] }]));
   const MAX_ITEM_ID = ITEMS[ITEMS.length - 1][0];
+  // Spindown can land on Dad's Note (from Sausage), but the Note itself can't be rerolled by anything,
+  // so every chain ends there and nothing above it reaches Strawman or lower.
+  const NO_REROLL = new Set([668]);
+  const noReroll = (it) => `<b>#${it.id} ${esc(it.name)}</b> can’t be rerolled, not even by Spindown Dice`;
 
   function spinOwners(it) {
     return loaded().filter((p) => !it.ach || p.unlocked.has(it.ach));
@@ -1059,6 +1063,7 @@
     // Forward: what this item becomes after 1..N uses.
     let fwd = '', id = cur.id;
     for (let use = 1; use <= state.spin.steps; use++) {
+      if (NO_REROLL.has(id)) { fwd += `<li><span class="uses">${use}×</span><span>${noReroll(itemById.get(id))}, so the chain ends here.</span></li>`; break; }
       let next = id - 1;
       const skipped = [];
       while (next >= 1 && skipReason(next)) { if (itemById.get(next)) skipped.push(next); next--; }
@@ -1071,8 +1076,9 @@
     let back = '', uses = 0;
     let backSkipped = [];
     for (let up = cur.id + 1; up <= MAX_ITEM_ID && uses < state.spin.steps; up++) {
-      if (!skipReason(up)) { uses++; back += chainRow(uses, itemById.get(up), backSkipped); backSkipped = []; }
-      else if (itemById.get(up)) backSkipped.push(up);
+      if (skipReason(up)) { if (itemById.get(up)) backSkipped.push(up); continue; }
+      if (NO_REROLL.has(up)) { back += `<li><span></span><span>${noReroll(itemById.get(up))}, so nothing from there up spins down to this item.</span></li>`; break; }
+      uses++; back += chainRow(uses, itemById.get(up), backSkipped); backSkipped = [];
     }
 
     const curSkip = skipReason(cur.id);
